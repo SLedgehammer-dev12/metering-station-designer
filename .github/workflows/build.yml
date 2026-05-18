@@ -36,4 +36,6 @@ jobs:
 
       - name: Upload to Release
         run: |
-          gh release upload v1.0.0 MeteringStationDesigner_Windows.zip --clobber --repo ${{ github.repository }}
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/tags/v1.0.0" -Headers @{Authorization="Bearer ${{ secrets.GITHUB_TOKEN }}"}
+          $uploadUrl = $release.upload_url -replace '{.*}','?name=MeteringStationDesigner_Windows.zip'
+          Invoke-RestMethod -Uri $uploadUrl -Method Post -Headers @{Authorization="Bearer ${{ secrets.GITHUB_TOKEN }}"; "Content-Type"="application/zip"} -InFile MeteringStationDesigner_Windows.zip
