@@ -20,24 +20,30 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka ordered-set
+          pip install pyinstaller
 
-      - name: Build with Nuitka
+      - name: Build with PyInstaller
         run: |
-          python -m nuitka --standalone --windows-console-mode=disable --enable-plugin=tk-inter --include-package=streamlit --include-package=plotly --include-package=numpy --include-package=pandas --include-package=pyaga8 --include-package=CoolProp --include-package=fluids --include-package=thermo --include-package=openpyxl --include-package=reportlab --include-package=metering_designer --include-package=streamlit_app --include-data-dir=knowledge=knowledge --output-dir=dist --assume-yes-for-downloads --windows-company-name=Metering-Designer --windows-product-name="Metering Station Designer" --windows-file-description="Measurement Station Design Tool" --windows-file-version=1.0.0 --windows-product-version=1.0.0 streamlit_app/app.py
+          pyinstaller --onedir --windowed --name MeteringStationDesigner `
+            --add-data "knowledge;knowledge" `
+            --hidden-import=streamlit --hidden-import=plotly `
+            --hidden-import=pyaga8 --hidden-import=CoolProp `
+            --hidden-import=fluids --hidden-import=thermo `
+            --hidden-import=openpyxl --hidden-import=reportlab `
+            streamlit_app/app.py
 
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: MeteringDesigner-Windows
-          path: dist/app.dist/
+      - name: Verify build
+        run: |
+          echo "Build output:"
+          dir dist\MeteringStationDesigner\*.exe
 
       - name: Zip for release
-        run: Compress-Archive -Path dist/app.dist/* -DestinationPath MeteringDesigner_v1.0.0_Windows.zip
+        run: |
+          Compress-Archive -Path dist\MeteringStationDesigner\* -DestinationPath MeteringStationDesigner_v1.0.0_Windows.zip
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: MeteringDesigner_v1.0.0_Windows.zip
+          files: MeteringStationDesigner_v1.0.0_Windows.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
