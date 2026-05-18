@@ -23,22 +23,17 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
+        shell: cmd
         run: |
-          pyinstaller --onedir --console --name MeteringStationDesigner ^
-            --add-data "knowledge;knowledge" ^
-            --hidden-import=streamlit --hidden-import=plotly ^
-            --hidden-import=pyaga8 --hidden-import=CoolProp ^
-            --hidden-import=fluids --hidden-import=thermo ^
-            --hidden-import=openpyxl --hidden-import=reportlab ^
-            streamlit_app/app.py
+          pyinstaller --onedir --console --name MeteringStationDesigner --add-data "knowledge;knowledge" --hidden-import=streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab streamlit_app/app.py
 
-      - name: Zip artifact
+      - name: Verify and Zip
         run: |
           dir dist\MeteringStationDesigner\
           7z a MeteringStationDesigner_v1.0.0_Windows.zip .\dist\MeteringStationDesigner\*
 
       - name: Upload to Release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           gh release upload v1.0.0 MeteringStationDesigner_v1.0.0_Windows.zip --clobber
