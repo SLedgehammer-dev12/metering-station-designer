@@ -24,7 +24,7 @@ jobs:
 
       - name: Build with Nuitka
         run: |
-          python -m nuitka --standalone --onefile=false --windows-console-mode=disable --enable-plugin=tk-inter --include-package=streamlit --include-package=plotly --include-package=numpy --include-package=pandas --include-package=pyaga8 --include-package=CoolProp --include-package=fluids --include-package=thermo --include-package=openpyxl --include-package=reportlab --include-package=metering_designer --include-package=streamlit_app --include-data-dir=knowledge=knowledge --output-dir=dist --assume-yes-for-downloads --windows-company-name=Metering-Designer --windows-product-name="Metering Station Designer" --windows-file-description="Measurement Station Design Tool" --windows-file-version=1.0.0 --windows-product-version=1.0.0 streamlit_app/app.py
+          python -m nuitka --standalone --windows-console-mode=disable --enable-plugin=tk-inter --include-package=streamlit --include-package=plotly --include-package=numpy --include-package=pandas --include-package=pyaga8 --include-package=CoolProp --include-package=fluids --include-package=thermo --include-package=openpyxl --include-package=reportlab --include-package=metering_designer --include-package=streamlit_app --include-data-dir=knowledge=knowledge --output-dir=dist --assume-yes-for-downloads --windows-company-name=Metering-Designer --windows-product-name="Metering Station Designer" --windows-file-description="Measurement Station Design Tool" --windows-file-version=1.0.0 --windows-product-version=1.0.0 streamlit_app/app.py
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

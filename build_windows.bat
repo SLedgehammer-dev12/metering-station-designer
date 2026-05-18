@@ -31,7 +31,6 @@ echo [3/4] Building with Nuitka (this may take 10-30 minutes)...
 echo.
 python -m nuitka ^
   --standalone ^
-  --onefile=false ^
   --windows-console-mode=disable ^
   --enable-plugin=tk-inter ^
   --include-package=streamlit ^
