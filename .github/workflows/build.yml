@@ -8,6 +8,8 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -30,10 +32,8 @@ jobs:
       - name: Verify and Zip
         run: |
           dir dist\MeteringStationDesigner\
-          7z a MeteringStationDesigner_v1.0.0_Windows.zip .\dist\MeteringStationDesigner\*
+          7z a MeteringStationDesigner_Windows.zip .\dist\MeteringStationDesigner\*
 
       - name: Upload to Release
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          gh release upload v1.0.0 MeteringStationDesigner_v1.0.0_Windows.zip --clobber
+          gh release upload v1.0.0 MeteringStationDesigner_Windows.zip --clobber --repo ${{ github.repository }}
