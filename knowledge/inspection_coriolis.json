@@ -1,0 +1,51 @@
+{
+  "metadata": {"standard": "AGA Report No.11 / ISO 10790", "version": "1.0"},
+  "components": {
+    "coriolis_body": {
+      "name_tr": "Coriolis Metre Gövdesi",
+      "name_en": "Coriolis Meter Body",
+      "standard": "AGA 11 §3 + ISO 10790",
+      "parameters": {
+        "tube_condition": {
+          "label_tr": "Ölçüm Tüpü Durumu",
+          "label_en": "Measurement Tube Condition",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["clean"], "reject": ["coated", "eroded", "corroded"]},
+          "options": [
+            {"value": "clean", "label_tr": "Temiz", "label_en": "Clean", "status": "PASS"},
+            {"value": "thin_coating", "label_tr": "İnce kaplama", "label_en": "Thin coating", "status": "CONDITIONAL"},
+            {"value": "coated", "label_tr": "Kalın kaplama/çökelti", "label_en": "Heavy coating", "status": "FAIL"},
+            {"value": "eroded", "label_tr": "Erozyonlu", "label_en": "Eroded", "status": "FAIL"}
+          ],
+          "clause": "AGA 11 §3.1",
+          "criticality": "CRITICAL"
+        },
+        "zero_stability": {
+          "label_tr": "Sıfır Kararlılığı (Zero Drift)",
+          "label_en": "Zero Stability Drift",
+          "unit": "kg/h",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "AGA 11 §5.2",
+          "criticality": "CRITICAL"
+        },
+        "mounting_stress": {
+          "label_tr": "Montaj Gerilimi (pipe stress)",
+          "label_en": "Mounting Pipe Stress",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["no_stress"], "reject": ["visible_deflection", "vibration"]},
+          "options": [
+            {"value": "no_stress", "label_tr": "Gerilim yok", "label_en": "No stress", "status": "PASS"},
+            {"value": "minor_misalign", "label_tr": "Hafif eksen kaçıklığı", "label_en": "Minor misalignment", "status": "CONDITIONAL"},
+            {"value": "visible_deflection", "label_tr": "Gözle görülür eğilme", "label_en": "Visible deflection", "status": "FAIL"},
+            {"value": "vibration", "label_tr": "Titreşim var", "label_en": "Vibration present", "status": "FAIL"}
+          ],
+          "clause": "AGA 11 §4.1",
+          "criticality": "MAJOR"
+        }
+      }
+    }
+  }
+}

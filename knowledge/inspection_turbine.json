@@ -1,0 +1,60 @@
+{
+  "metadata": {"standard": "AGA Report No.7 / ISO 9951", "version": "1.0"},
+  "components": {
+    "turbine_body": {
+      "name_tr": "Türbin Metre Gövdesi",
+      "name_en": "Turbine Meter Body",
+      "standard": "AGA 7 §3 + ISO 9951",
+      "parameters": {
+        "body_diameter": {
+          "label_tr": "Gövde İç Çapı",
+          "label_en": "Body Internal Diameter",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 0.5, "base_param": "D"},
+          "clause": "AGA 7 §3.1",
+          "criticality": "CRITICAL"
+        },
+        "body_ovality": {
+          "label_tr": "Gövde Ovalliği",
+          "label_en": "Body Ovality",
+          "unit": "mm",
+          "points": {"count": 1, "computed": true},
+          "tolerance": {"type": "percentage", "value": 0.5, "base_param": "D"},
+          "clause": "AGA 7 §3.1",
+          "criticality": "MAJOR"
+        },
+        "rotor_freedom": {
+          "label_tr": "Rotor Serbest Dönüşü",
+          "label_en": "Rotor Free Rotation",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["free"], "reject": ["stiff", "stuck"]},
+          "options": [
+            {"value": "free", "label_tr": "Serbest dönüyor", "label_en": "Spins freely", "status": "PASS"},
+            {"value": "minor_drag", "label_tr": "Hafif sürtünme", "label_en": "Minor drag", "status": "CONDITIONAL"},
+            {"value": "stiff", "label_tr": "Zor dönüyor", "label_en": "Stiff rotation", "status": "FAIL"},
+            {"value": "stuck", "label_tr": "Dönmüyor", "label_en": "Stuck", "status": "FAIL"}
+          ],
+          "clause": "AGA 7 §4.1",
+          "criticality": "CRITICAL"
+        },
+        "straightening_vane": {
+          "label_tr": "Akış Düzenleyici Kanat Durumu",
+          "label_en": "Flow Straightener Condition",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["clean_undamaged"], "reject": ["bent", "corroded", "missing"]},
+          "options": [
+            {"value": "clean_undamaged", "label_tr": "Temiz, hasarsız", "label_en": "Clean, undamaged", "status": "PASS"},
+            {"value": "minor_fouling", "label_tr": "Hafif kirlenme", "label_en": "Minor fouling", "status": "CONDITIONAL"},
+            {"value": "bent", "label_tr": "Eğilmiş kanat", "label_en": "Bent vane", "status": "FAIL"},
+            {"value": "corroded", "label_tr": "Korozyonlu", "label_en": "Corroded", "status": "FAIL"}
+          ],
+          "clause": "AGA 7 §3.2",
+          "criticality": "MAJOR"
+        }
+      }
+    }
+  }
+}

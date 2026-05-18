@@ -1,0 +1,195 @@
+{
+  "metadata": {
+    "standard": "ASME B31.3-2020 Table A-1",
+    "description": "İzin verilen gerilme değerleri (Allowable Stress - S) MPa cinsinden",
+    "units": "MPa",
+    "version": "1.0"
+  },
+  "materials": {
+    "A106_GrB": {
+      "name": "Carbon Steel A106 Grade B",
+      "specification": "ASTM A106 Gr.B",
+      "type": "seamless",
+      "min_yield_MPa": 241,
+      "min_tensile_MPa": 414,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 134,
+        "100": 120,
+        "150": 115,
+        "200": 110,
+        "250": 101,
+        "300": 92,
+        "350": 83,
+        "400": 74
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "yes_below_260C"
+    },
+    "A333_Gr6": {
+      "name": "Low-Temp Carbon Steel A333 Grade 6",
+      "specification": "ASTM A333 Gr.6",
+      "type": "seamless",
+      "min_yield_MPa": 241,
+      "min_tensile_MPa": 414,
+      "allowable_stress": {
+        "-46_to_40": 138,
+        "50": 134,
+        "100": 120,
+        "150": 115,
+        "200": 110,
+        "250": 101,
+        "300": 92,
+        "350": 83,
+        "400": 74
+      },
+      "max_temp_C": 400,
+      "min_temp_C": -46,
+      "nace_compliant": "yes_below_260C"
+    },
+    "A312_TP304": {
+      "name": "Stainless Steel 304",
+      "specification": "ASTM A312 TP304",
+      "type": "seamless",
+      "min_yield_MPa": 207,
+      "min_tensile_MPa": 517,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 135,
+        "100": 105,
+        "150": 86,
+        "200": 73,
+        "250": 63,
+        "300": 56,
+        "350": 52,
+        "400": 48,
+        "450": 44,
+        "500": 42,
+        "525": 41,
+        "550": 40,
+        "575": 39,
+        "600": 38,
+        "625": 33,
+        "650": 25,
+        "675": 20,
+        "700": 16
+      },
+      "max_temp_C": 700,
+      "nace_compliant": "yes"
+    },
+    "A312_TP316": {
+      "name": "Stainless Steel 316",
+      "specification": "ASTM A312 TP316",
+      "type": "seamless",
+      "min_yield_MPa": 207,
+      "min_tensile_MPa": 517,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 136,
+        "100": 105,
+        "150": 88,
+        "200": 76,
+        "250": 66,
+        "300": 59,
+        "350": 56,
+        "400": 53,
+        "450": 51,
+        "500": 49,
+        "525": 48,
+        "550": 47,
+        "575": 46,
+        "600": 45,
+        "625": 42,
+        "650": 34,
+        "675": 27,
+        "700": 21
+      },
+      "max_temp_C": 700,
+      "nace_compliant": "yes"
+    },
+    "A312_TP321": {
+      "name": "Stainless Steel 321",
+      "specification": "ASTM A312 TP321",
+      "type": "seamless",
+      "min_yield_MPa": 207,
+      "min_tensile_MPa": 517,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 136,
+        "100": 105,
+        "150": 85,
+        "200": 73,
+        "250": 62,
+        "300": 56,
+        "350": 52,
+        "400": 48,
+        "450": 43,
+        "500": 41,
+        "525": 40,
+        "550": 40,
+        "575": 39,
+        "600": 39,
+        "625": 38,
+        "650": 34,
+        "675": 27,
+        "700": 20
+      },
+      "max_temp_C": 700,
+      "nace_compliant": "yes"
+    },
+    "A312_Duplex_2205": {
+      "name": "Duplex SS 2205",
+      "specification": "ASTM A790 S31803",
+      "type": "seamless",
+      "min_yield_MPa": 448,
+      "min_tensile_MPa": 690,
+      "allowable_stress": {
+        "-29_to_40": 230,
+        "50": 230,
+        "100": 213,
+        "150": 199,
+        "200": 189,
+        "250": 181,
+        "300": 173,
+        "350": 165,
+        "400": 157
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "yes_sour_limited"
+    },
+    "API_5L_X52": {
+      "name": "API 5L X52 (Line Pipe)",
+      "specification": "API 5L X52",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 358,
+      "min_tensile_MPa": 455,
+      "allowable_stress": {
+        "-29_to_40": 172,
+        "50": 169,
+        "100": 163,
+        "150": 157,
+        "200": 152,
+        "250": 146,
+        "300": 140,
+        "350": 135,
+        "400": 129
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "with_SSC_test"
+    }
+  },
+  "schedule_data": {
+    "notes": "Standard pipe dimensions per ASME B36.10M",
+    "schedules": {
+      "4_inch": {"od_mm": 114.3, "sch_40_wall": 6.02, "sch_80_wall": 8.56, "sch_160_wall": 13.49},
+      "6_inch": {"od_mm": 168.3, "sch_40_wall": 7.11, "sch_80_wall": 10.97, "sch_160_wall": 18.26},
+      "8_inch": {"od_mm": 219.1, "sch_40_wall": 8.18, "sch_80_wall": 12.70, "sch_160_wall": 23.01},
+      "10_inch": {"od_mm": 273.1, "sch_40_wall": 9.27, "sch_80_wall": 15.09, "sch_160_wall": 28.58},
+      "12_inch": {"od_mm": 323.8, "sch_40_wall": 10.31, "sch_80_wall": 17.48, "sch_160_wall": 33.32},
+      "16_inch": {"od_mm": 406.4, "sch_40_wall": 12.70, "sch_80_wall": 21.44, "sch_160_wall": 40.49},
+      "20_inch": {"od_mm": 508.0, "sch_40_wall": 15.09, "sch_80_wall": 26.19, "sch_XS_wall": 12.70},
+      "24_inch": {"od_mm": 609.6, "sch_40_wall": 17.48, "sch_80_wall": 30.96, "sch_XS_wall": 12.70}
+    },
+    "standard_schedules": ["Sch 10", "Sch 20", "Sch 30", "Sch 40", "Sch 60", "Sch 80", "Sch 100", "Sch 120", "Sch 140", "Sch 160", "Sch STD", "Sch XS", "Sch XXS"]
+  }
+}

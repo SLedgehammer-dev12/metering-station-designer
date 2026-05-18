@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.streamlit/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+.DS_Store
+Thumbs.db
+*.spec
+*.manifest
+*.iss.bak

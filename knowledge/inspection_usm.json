@@ -1,0 +1,89 @@
+{
+  "metadata": {"standard": "AGA Report No.9 / ISO 17089-1", "version": "1.0"},
+  "components": {
+    "usm_body": {
+      "name_tr": "USM Metre Gövdesi",
+      "name_en": "USM Meter Body",
+      "standard": "AGA 9 §3",
+      "parameters": {
+        "body_diameter": {
+          "label_tr": "Gövde İç Çapı",
+          "label_en": "Body Internal Diameter",
+          "unit": "mm",
+          "points": {"count": 8, "angular_count": 4, "positions": 2, "labels": ["0°@inlet","90°@inlet","45°@inlet","135°@inlet","0°@outlet","90°@outlet","45°@outlet","135°@outlet"]},
+          "tolerance": {"type": "percentage", "value": 0.25, "base_param": "D"},
+          "clause": "AGA 9 §3.2",
+          "criticality": "CRITICAL",
+          "uncertainty_factor": 0.4
+        },
+        "body_ovality": {
+          "label_tr": "Gövde Ovalliği",
+          "label_en": "Body Ovality",
+          "unit": "mm",
+          "points": {"count": 1, "computed": true},
+          "tolerance": {"type": "percentage", "value": 0.5, "base_param": "D"},
+          "clause": "AGA 9 §3.2",
+          "criticality": "MAJOR"
+        },
+        "internal_condition": {
+          "label_tr": "İç Yüzey Durumu",
+          "label_en": "Internal Surface Condition",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["clean_smooth"], "reject": ["rust", "deposits", "burrs"]},
+          "options": [
+            {"value": "clean_smooth", "label_tr": "Temiz ve pürüzsüz", "label_en": "Clean & Smooth", "status": "PASS"},
+            {"value": "minor_deposits", "label_tr": "Hafif tortu (kabul edilebilir)", "label_en": "Minor deposits (Acceptable)", "status": "CONDITIONAL"},
+            {"value": "rust", "label_tr": "Pas/korozyon", "label_en": "Rust/Corrosion", "status": "FAIL"},
+            {"value": "burrs", "label_tr": "Çapak/keskin kenar", "label_en": "Burrs", "status": "FAIL"}
+          ],
+          "clause": "AGA 9 §3.1",
+          "criticality": "MAJOR"
+        },
+        "flange_alignment": {
+          "label_tr": "Flanş Paralelliği",
+          "label_en": "Flange Parallelism",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "AGA 9 §3.3",
+          "criticality": "MINOR"
+        }
+      }
+    },
+    "usm_transducers": {
+      "name_tr": "USM Transduserler",
+      "name_en": "USM Transducers",
+      "standard": "AGA 9 §4",
+      "parameters": {
+        "transducer_angular": {
+          "label_tr": "Transduser Açısal Konumu",
+          "label_en": "Transducer Angular Position",
+          "unit": "°",
+          "points": {"count": 4, "labels": ["Path1-A","Path1-B","Path2-A","Path2-B"]},
+          "tolerance": {"type": "percentage", "value": 0.5, "base_param": "nominal_angle"},
+          "clause": "AGA 9 §4.2",
+          "criticality": "CRITICAL"
+        },
+        "transducer_axial": {
+          "label_tr": "Transduser Eksenel Konumu",
+          "label_en": "Transducer Axial Position",
+          "unit": "mm",
+          "points": {"count": 4, "labels": ["Path1-A","Path1-B","Path2-A","Path2-B"]},
+          "tolerance": {"type": "max_value", "value": 0.5},
+          "clause": "AGA 9 §4.2",
+          "criticality": "MAJOR"
+        },
+        "transducer_protrusion": {
+          "label_tr": "Transduser Çıkıntısı",
+          "label_en": "Transducer Protrusion",
+          "unit": "mm",
+          "points": {"count": 4, "labels": ["Path1-A","Path1-B","Path2-A","Path2-B"]},
+          "tolerance": {"type": "percentage", "value": 1.0, "base_param": "D"},
+          "clause": "AGA 9 §4.1",
+          "criticality": "MAJOR"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "metadata": {"standard": "ASME B31.3 / ASME B31.4 / ASME B31.8 / B36.10M", "version": "1.0"},
+  "components": {
+    "piping": {
+      "name_tr": "Borulama",
+      "name_en": "Piping",
+      "standard": "ASME B31.3 + B36.10M",
+      "parameters": {
+        "od": {
+          "label_tr": "Dış Çap",
+          "label_en": "Outside Diameter",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 1.0, "base_param": "OD"},
+          "clause": "ASME B36.10M",
+          "criticality": "MINOR"
+        },
+        "wall_thickness": {
+          "label_tr": "Et Kalınlığı",
+          "label_en": "Wall Thickness",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "min_value", "value": "t_min_B31.3"},
+          "clause": "ASME B31.3",
+          "criticality": "CRITICAL"
+        },
+        "weld_quality": {
+          "label_tr": "Kaynak Kalitesi",
+          "label_en": "Weld Quality",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["passed_NDT"], "reject": ["porosity", "cracks", "undercut"]},
+          "options": [
+            {"value": "passed_NDT", "label_tr": "NDT geçti (RT/UT/PT)", "label_en": "NDT passed", "status": "PASS"},
+            {"value": "minor_indication", "label_tr": "Küçük endikasyon", "label_en": "Minor indication", "status": "CONDITIONAL"},
+            {"value": "porosity", "label_tr": "Gözeneklilik", "label_en": "Porosity", "status": "FAIL"},
+            {"value": "cracks", "label_tr": "Çatlak", "label_en": "Cracks", "status": "FAIL"}
+          ],
+          "clause": "ASME B31.3 Ch.V",
+          "criticality": "CRITICAL"
+        },
+        "corrosion": {
+          "label_tr": "Korozyon Durumu",
+          "label_en": "Corrosion Condition",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["none"], "reject": ["pitting", "wall_loss"]},
+          "options": [
+            {"value": "none", "label_tr": "Korozyon yok", "label_en": "No corrosion", "status": "PASS"},
+            {"value": "surface_rust", "label_tr": "Yüzey pası", "label_en": "Surface rust", "status": "CONDITIONAL"},
+            {"value": "pitting", "label_tr": "Oyuklanma", "label_en": "Pitting", "status": "FAIL"},
+            {"value": "wall_loss", "label_tr": "Et kalınlığı kaybı", "label_en": "Wall thickness loss", "status": "FAIL"}
+          ],
+          "clause": "ASME B31.3",
+          "criticality": "MAJOR"
+        }
+      }
+    }
+  }
+}

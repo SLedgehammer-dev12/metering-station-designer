@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Metre puanlama kriterleri ve varsayılan ağırlıklar"
+  },
+  "default_weights": {
+    "technical_fitness": 0.25,
+    "accuracy_metrology": 0.25,
+    "operational_ease": 0.15,
+    "cost": 0.15,
+    "implementability": 0.10,
+    "project_specific": 0.10
+  },
+  "categories": {
+    "technical_fitness": {
+      "weight": 0.25,
+      "criteria": {
+        "fluid_compatibility": {"weight": 0.25, "description": "Akışkan tipi uygunluğu (gaz/sıvı/viskoz)"},
+        "turndown_coverage": {"weight": 0.25, "description": "Turndown oranının gereksinimi karşılama yüzdesi"},
+        "pipe_size_fit": {"weight": 0.20, "description": "Hat çapına uygunluk - metre NPS aralığında mı?"},
+        "flow_velocity_fit": {"weight": 0.15, "description": "Akış hızının metre sınırları içinde kalması"},
+        "h2s_compatibility": {"weight": 0.15, "description": "Sour servis (H₂S) uyumluluğu"}
+      }
+    },
+    "accuracy_metrology": {
+      "weight": 0.25,
+      "criteria": {
+        "base_uncertainty": {"weight": 0.35, "description": "Tipik ölçüm belirsizliği"},
+        "custody_transfer_approval": {"weight": 0.25, "description": "Custody transfer / MID onay durumu"},
+        "reproducibility": {"weight": 0.20, "description": "Kısa dönem tekrarlanabilirlik"},
+        "long_term_stability": {"weight": 0.20, "description": "Uzun dönem kalibrasyon kararlılığı (drift)"}
+      }
+    },
+    "operational_ease": {
+      "weight": 0.15,
+      "criteria": {
+        "pressure_loss": {"weight": 0.25, "description": "Kalıcı basınç kaybı - işletme basıncına oranı"},
+        "straight_pipe_requirement": {"weight": 0.25, "description": "Gerekli düz boru boyu (L/D)"},
+        "maintenance_burden": {"weight": 0.20, "description": "Bakım sıklığı ve karmaşıklığı"},
+        "fouling_resistance": {"weight": 0.15, "description": "Partikül/safsızlık toleransı"},
+        "pressure_rating_fit": {"weight": 0.15, "description": "Maksimum basınç sınıfı yeterliliği"}
+      }
+    },
+    "cost": {
+      "weight": 0.15,
+      "criteria": {
+        "capex": {"weight": 0.35, "description": "Ekipman yatırım maliyeti (orifise göre rölatif)"},
+        "installation": {"weight": 0.25, "description": "Kurulum karmaşıklığı - temel/montaj/kablo"},
+        "calibration": {"weight": 0.20, "description": "Kalibrasyon maliyeti - prover/master meter"},
+        "opex": {"weight": 0.20, "description": "Yıllık işletme gideri - yedek parça/enerji"}
+      }
+    },
+    "implementability": {
+      "weight": 0.10,
+      "criteria": {
+        "lead_time": {"weight": 0.20, "description": "Tedarik süresi (hafta)"},
+        "local_expertise": {"weight": 0.25, "description": "Bölgede kalifiye ekip/bakım imkanı"},
+        "spare_parts": {"weight": 0.20, "description": "Yedek parça erişim kolaylığı"},
+        "infrastructure": {"weight": 0.15, "description": "Alt yapı gereksinimleri (klima, güç, SCADA)"},
+        "climate": {"weight": 0.10, "description": "İklim koşullarına uygunluk"},
+        "transport": {"weight": 0.10, "description": "Nakliye kısıtlamaları (büyük/ağır ekipman)"}
+      }
+    },
+    "project_specific": {
+      "weight": 0.10,
+      "criteria": {
+        "track_record": {"weight": 0.30, "description": "Benzer projelerde kanıtlanmış kullanım (saha tecrübesi)"},
+        "compactness": {"weight": 0.25, "description": "Kompaktlık / skid footprint"},
+        "online_verification": {"weight": 0.20, "description": "Proses kesmeden kalibrasyon/doğrulama imkanı"},
+        "noise_environmental": {"weight": 0.15, "description": "Gürültü ve çevresel etki"},
+        "wet_gas_capability": {"weight": 0.10, "description": "Islak gaz / iki fazlı akış kapasitesi"}
+      }
+    }
+  },
+  "tier_thresholds": {
+    "optimal": {"min": 85, "max": 100, "tier": "★★★", "color": "green", "label_tr": "Optimal - En iyi tercih"},
+    "good": {"min": 70, "max": 85, "tier": "★★☆", "color": "blue", "label_tr": "İyi alternatif"},
+    "adequate": {"min": 50, "max": 70, "tier": "★☆☆", "color": "orange", "label_tr": "Değerlendirilebilir"},
+    "not_recommended": {"min": 0, "max": 50, "tier": "—–", "color": "red", "label_tr": "Önerilmez"}
+  },
+  "flow_conditioner_scoring": {
+    "default_weights": {
+      "pressure_loss": 0.30,
+      "straight_pipe_reduction": 0.25,
+      "iso_compliance": 0.20,
+      "maintenance": 0.10,
+      "cost": 0.10,
+      "installation": 0.05
+    }
+  }
+}

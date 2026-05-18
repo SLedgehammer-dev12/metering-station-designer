@@ -1,0 +1,202 @@
+{
+  "metadata": {"standard": "ISO 5167-1 Tablo 4 + ISO 5167-2 §7.4", "version": "1.0"},
+  "components": {
+    "conditioner_zanker": {
+      "name_tr": "Zanker Plakası",
+      "name_en": "Zanker Plate",
+      "standard": "ISO 5167-2 §7.4.3",
+      "hole_count": 36,
+      "parameters": {
+        "hole_diameters": {
+          "label_tr": "Delik Çapları",
+          "label_en": "Hole Diameters",
+          "unit": "mm",
+          "points": {"count": "*", "dynamic": true, "variable_text": "her delik için ayrı"},
+          "tolerance": {"type": "percentage_or_absolute", "percentage": 2.0, "absolute_mm": 0.1, "base_param": "d_hole", "use": "larger"},
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MAJOR"
+        },
+        "hole_positions": {
+          "label_tr": "Delik Konumları (merkezden yarıçap)",
+          "label_en": "Hole Positions (radius from center)",
+          "unit": "mm",
+          "points": {"count": "*", "dynamic": true, "variable_text": "her delik için ayrı"},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MAJOR"
+        },
+        "plate_thickness": {
+          "label_tr": "Plaka Kalınlığı",
+          "label_en": "Plate Thickness",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 2.5, "max": 5.0},
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MAJOR"
+        },
+        "hole_chamfers": {
+          "label_tr": "Delik Pahları (giriş+çıkış 45°)",
+          "label_en": "Hole Chamfers (inlet+outlet 45°)",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["chamfered"], "reject": ["sharp", "missing"]},
+          "options": [
+            {"value": "chamfered", "label_tr": "45° pahlı", "label_en": "45° chamfered", "status": "PASS"},
+            {"value": "partial", "label_tr": "Kısmi pahlı", "label_en": "Partial chamfer", "status": "CONDITIONAL"},
+            {"value": "sharp", "label_tr": "Keskin kenar (pah yok)", "label_en": "Sharp edge (no chamfer)", "status": "FAIL"}
+          ],
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MINOR"
+        },
+        "open_area_ratio": {
+          "label_tr": "Toplam Açık Alan Oranı",
+          "label_en": "Total Open Area Ratio",
+          "unit": "%",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 40, "max": 60},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "CRITICAL"
+        },
+        "plate_flatness": {
+          "label_tr": "Plaka Düzlemselliği",
+          "label_en": "Plate Flatness",
+          "unit": "mm sapma",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 0.5},
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MINOR"
+        },
+        "plate_alignment": {
+          "label_tr": "Plaka-Flanş Eksenel Kaçıklığı",
+          "label_en": "Plate-Flange Axial Offset",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-2 §7.4.3",
+          "criticality": "MINOR"
+        }
+      }
+    },
+    "conditioner_cpa": {
+      "name_tr": "CPA 50E",
+      "name_en": "CPA 50E",
+      "standard": "ISO 5167-1 Tablo 4",
+      "hole_count": 25,
+      "parameters": {
+        "hole_diameters": {
+          "label_tr": "Delik Çapları",
+          "label_en": "Hole Diameters",
+          "unit": "mm",
+          "points": {"count": "*", "dynamic": true, "variable_text": "her delik için ayrı"},
+          "tolerance": {"type": "max_value", "value": 0.1},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "CRITICAL"
+        },
+        "plate_thickness": {
+          "label_tr": "Plaka Kalınlığı",
+          "label_en": "Plate Thickness",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 0.1},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "MAJOR"
+        },
+        "hole_positions": {
+          "label_tr": "Delik Konumları",
+          "label_en": "Hole Positions",
+          "unit": "mm",
+          "points": {"count": "*", "dynamic": true, "variable_text": "her delik için ayrı"},
+          "tolerance": {"type": "max_value", "value": 0.5},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "MAJOR"
+        },
+        "center_hole": {
+          "label_tr": "Merkez Delik Çapı",
+          "label_en": "Center Hole Diameter",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 0.2},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "CRITICAL"
+        }
+      }
+    },
+    "conditioner_tube_bundle": {
+      "name_tr": "19-Tüp Demeti",
+      "name_en": "19-Tube Bundle",
+      "standard": "ISO 5167-2 §7.4.2",
+      "parameters": {
+        "tube_diameters": {
+          "label_tr": "Tüp İç Çapları",
+          "label_en": "Tube Internal Diameters",
+          "unit": "mm",
+          "points": {"count": 19, "variable_text": "19 tüp için ayrı"},
+          "tolerance": {"type": "max_value", "value": 0.1},
+          "clause": "ISO 5167-2 §7.4.2",
+          "criticality": "MAJOR"
+        },
+        "tube_length": {
+          "label_tr": "Tüp Uzunluğu",
+          "label_en": "Tube Length",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": "1.5×d_tube", "max": "2.5×d_tube"},
+          "clause": "ISO 5167-2 §7.4.2",
+          "criticality": "MAJOR"
+        },
+        "tube_parallelism": {
+          "label_tr": "Tüp Paralelliği",
+          "label_en": "Tube Parallelism",
+          "unit": "°",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-2 §7.4.2",
+          "criticality": "MAJOR"
+        },
+        "tube_positions": {
+          "label_tr": "Tüp Konumları (hegzagonal desen)",
+          "label_en": "Tube Positions (hexagonal pattern)",
+          "unit": "mm",
+          "points": {"count": 19, "variable_text": "19 tüp merkez konumu"},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-2 §7.4.2",
+          "criticality": "MINOR"
+        }
+      }
+    },
+    "conditioner_perforated": {
+      "name_tr": "Perfore Plaka",
+      "name_en": "Perforated Plate",
+      "standard": "Genel (ISO uyumlu değil)",
+      "parameters": {
+        "hole_diameters": {
+          "label_tr": "Delik Çapları",
+          "label_en": "Hole Diameters",
+          "unit": "mm",
+          "points": {"count": "*", "dynamic": true, "variable_text": "her delik için ayrı"},
+          "tolerance": {"type": "max_value", "value": 0.2},
+          "clause": "Genel tolerans",
+          "criticality": "MAJOR"
+        },
+        "open_area_ratio": {
+          "label_tr": "Açık Alan Oranı",
+          "label_en": "Open Area Ratio",
+          "unit": "%",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 30, "max": 60},
+          "clause": "Genel tolerans",
+          "criticality": "MAJOR"
+        },
+        "plate_thickness": {
+          "label_tr": "Plaka Kalınlığı",
+          "label_en": "Plate Thickness",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 2.0, "max": 6.0},
+          "clause": "Genel tolerans",
+          "criticality": "MINOR"
+        }
+      }
+    }
+  }
+}

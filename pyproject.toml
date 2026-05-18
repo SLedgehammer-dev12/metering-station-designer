@@ -1,0 +1,30 @@
+[project]
+name = "metering-station-designer"
+version = "1.0.0"
+description = "Ölçüm İstasyonu Dizayn Asistanı — Multi-criteria meter selection, engineering calculations, and geometric inspection for natural gas & oil metering stations per ISO 5167, AGA 3/7/8/9/11, ASME B31.3/B16.5, IEC 60079, IEC 61511"
+authors = [
+    {name = "Metering Designer Team"},
+]
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.36.0",
+    "plotly>=5.20.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "openpyxl>=3.1.0",
+    "reportlab>=4.2.0",
+    "pyaga8>=0.1.0",
+    "CoolProp>=7.0.0",
+    "fluids>=1.2.0",
+    "thermo>=0.5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "nuitka>=2.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
