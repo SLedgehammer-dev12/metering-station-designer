@@ -24,24 +24,21 @@ jobs:
 
       - name: Build with PyInstaller
         run: |
-          pyinstaller --onedir --console --name MeteringStationDesigner `
-            --add-data "knowledge;knowledge" `
-            --hidden-import=streamlit --hidden-import=plotly `
-            --hidden-import=pyaga8 --hidden-import=CoolProp `
-            --hidden-import=fluids --hidden-import=thermo `
-            --hidden-import=openpyxl --hidden-import=reportlab `
+          pyinstaller --onedir --console --name MeteringStationDesigner ^
+            --add-data "knowledge;knowledge" ^
+            --hidden-import=streamlit --hidden-import=plotly ^
+            --hidden-import=pyaga8 --hidden-import=CoolProp ^
+            --hidden-import=fluids --hidden-import=thermo ^
+            --hidden-import=openpyxl --hidden-import=reportlab ^
             streamlit_app/app.py
 
-      - name: Verify and Zip
+      - name: Zip artifact
         run: |
-          echo "Build output:"
           dir dist\MeteringStationDesigner\
-          7z a -tzip MeteringStationDesigner_v1.0.0_Windows.zip .\dist\MeteringStationDesigner\*
+          7z a MeteringStationDesigner_v1.0.0_Windows.zip .\dist\MeteringStationDesigner\*
 
       - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: MeteringStationDesigner_v1.0.0_Windows.zip
-          tag_name: v1.0.0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v1.0.0 MeteringStationDesigner_v1.0.0_Windows.zip --clobber
