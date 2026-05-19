@@ -215,7 +215,6 @@ def generate_pdf_report(
         ]))
         story.append(fc_table)
 
-    # --- PAGE 3: Standards & Recommendations ---
     story.append(PageBreak())
     story.append(Paragraph("STANDARTLAR & ÖNERİLER", h2_style))
     story.append(HRFlowable(width="100%", thickness=1, color=HexColor("#1F4E79")))
@@ -259,6 +258,24 @@ def generate_pdf_report(
         story.append(Paragraph(f"• {w}", body_style))
     if not selected_meter.weaknesses:
         story.append(Paragraph("Belirgin zayıflık tespit edilmedi.", body_style))
+
+    # Glossary / Terimler Sözlüğü
+    story.append(Spacer(1, 8*mm))
+    story.append(Paragraph("Terimler Sözlüğü (Glossary)", h3_style))
+    glossary = {
+        "NPS": "Nominal Pipe Size — Boru anma çapı (inç). NPS 8 ≈ 219 mm",
+        "Sm3/h": "Standart metreküp/saat — 1 atm, 15°C referansta debi",
+        "Beta": "d/D — Delik çapı / boru iç çapı oranı. Orifis geometri parametresi",
+        "Cd": "Discharge Coefficient — Deşarj katsayısı, metrenin ölçme verimi",
+        "Re": "Reynolds Sayısı — Akış rejimi (türbülanslı/laminer)",
+        "barg": "Bar gauge — Atmosfer basıncına göre (1 bar = 14.5 psi)",
+        "API Gravite": "Ham petrol yoğunluk ölçüsü. >10 hafif, <22 ağır petrol",
+        "CAPEX": "Capital Expenditure — Yatırım maliyeti (ekipman + kurulum)",
+        "OPEX": "Operational Expenditure — İşletme maliyeti (bakım, enerji)",
+        "Turndown": "Qmax / Qmin — Metrenin ölçebildiği debi aralığı oranı",
+    }
+    for term, desc in sorted(glossary.items()):
+        story.append(Paragraph(f"<b>{term}:</b> {desc}", small_style))
 
     story.append(Spacer(1, 12*mm))
     story.append(HRFlowable(width="40%", thickness=0.5, color=HexColor("#CCCCCC")))

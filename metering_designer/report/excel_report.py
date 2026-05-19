@@ -56,13 +56,19 @@ def generate_excel_report(
     ws1.cell(row=2, column=1, value=f"Proje: {project.get('name','-')}  |  Konum: {project.get('location','-')}")
     ws1.cell(row=3, column=1, value=f"Tarih: {project.get('date','-')}  |  Etiket: {project.get('tag','-')}")
 
-    ws1.cell(row=5, column=1, value="SEÇILEN METRE").font = Font(bold=True, size=12)
-    ws1.cell(row=6, column=1, value=f"Tip: {selected_meter.name_tr}")
-    ws1.cell(row=6, column=2, value=f"Puan: {selected_meter.total_score}/100")
-    ws1.cell(row=6, column=3, value=f"Tier: {selected_meter.tier_label}")
+    ws1.cell(row=5, column=1, value="BU RAPOR NASIL OKUNMALI?").font = Font(bold=True, size=12, color="C62828")
+    ws1.merge_cells("A5:D5")
+    ws1.cell(row=6, column=1, value="Bu rapor, olcum istasyonunuz icin en uygun akis metre tipini belirlemek amaciyla hazirlanmistir.").font = Font(italic=True)
+    ws1.merge_cells("A6:D6")
+    ws1.cell(row=7, column=1, value="Program 6 kategoride 30+ kriteri degerlendirerek her metre tipine 0-100 arasi bir puan verir. En yuksek puan = en uygun secenek.")
+    ws1.merge_cells("A7:D7")
+    ws1.cell(row=9, column=1, value="SECILEN METRE").font = Font(bold=True, size=12)
+    ws1.cell(row=10, column=1, value=f"Tip: {selected_meter.name_tr}")
+    ws1.cell(row=10, column=2, value=f"Puan: {selected_meter.total_score}/100")
+    ws1.cell(row=10, column=3, value=f"Tier: {selected_meter.tier_label}")
 
-    ws1.cell(row=8, column=1, value="PROSES ÖZETI").font = Font(bold=True, size=12)
-    row = 9
+    ws1.cell(row=12, column=1, value="PROSES ÖZETI").font = Font(bold=True, size=12)
+    row = 13
     for k, v in [("Akışkan", process.get("fluid_type","-")),
                   ("Q min/nom/max", f"{process.get('qmin',0)}/{process.get('qnormal',0)}/{process.get('qmax',0)}"),
                   ("P işl / tas", f"{process.get('oper_p_bar',0)} / {process.get('design_p_bar',0)} barg"),
