@@ -34,6 +34,7 @@ def classify_ex(
     is_enclosed: bool = False,
     ventilation: str = "natural",
     has_gas_detection: bool = True,
+    composition: dict = None,
 ) -> dict:
     if fluid_type.startswith("gas"):
         if h2s and h2s_ppm > 100:
@@ -63,6 +64,13 @@ def classify_ex(
     temp_class = gas.get("temperature_class", "T1")
     max_surface = TEMPERATURE_CLASS_LIMITS.get(temp_class, {}).get("max_surface_C", 450)
 
+    # Auto-detect T-class from gas composition
+    if composition:
+        comp_t_class = _detect_t_class_from_composition(composition)
+        if comp_t_class:
+            temp_class = comp_t_class
+            max_surface = TEMPERATURE_CLASS_LIMITS.get(temp_class, {}).get("max_surface_C", 450)
+
     return {
         "gas_group": gas["group"],
         "temperature_class": temp_class,
@@ -81,3 +89,26 @@ def _recommend_protection(zone: str, gas_group: str) -> list[str]:
     elif zone == "Zone 2":
         return ["Ex nA (Non-sparking)", "Ex ec (Increased Safety)", "Ex nC (Enclosed break)"]
     return ["No special requirement"]
+
+
+def _detect_t_class_from_composition(composition: dict) -> str:
+    """Determine temperature class from gas composition by finding the component with lowest AIT."""
+    COMPONENT_AIT = {
+        "C1": 595, "C2": 472, "C3": 470, "iC4": 460, "nC4": 405,
+        "iC5": 420, "nC5": 260, "C6": 225, "C6plus": 220,
+        "N2": 9999, "CO2": 9999, "H2S": 260, "H2": 560, "CO": 609,
+    }
+    lowest_ait = 9999
+    lowest_comp = None
+    for comp, mol in composition.items():
+        ait = COMPONENT_AIT.get(comp, 9999)
+        if mol > 0.5 and ait < lowest_ait:
+            lowest_ait = ait
+            lowest_comp = comp
+
+    if lowest_ait >= 450: return "T1"
+    if lowest_ait >= 300: return "T2"
+    if lowest_ait >= 200: return "T3"
+    if lowest_ait >= 135: return "T4"
+    if lowest_ait >= 100: return "T5"
+    return "T6"
