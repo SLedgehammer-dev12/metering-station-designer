@@ -1,0 +1,44 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "edit": "ask",
+    "bash": {
+      "python -m pytest*": "allow",
+      "python -m json.tool knowledge/*.json": "allow",
+      "streamlit run*": "ask",
+      "git push*": "ask",
+      "git tag*": "ask",
+      "gh release*": "ask",
+      "pip install*": "ask",
+      "rm -rf*": "ask",
+      "*": "ask"
+    },
+    "todowrite": "allow",
+    "webfetch": "allow",
+    "question": "allow",
+    "websearch": "allow",
+    "skill": "allow",
+    "task": "allow"
+  },
+  "agent": {
+    "scoring-engine": {
+      "steps": 15
+    },
+    "meter-sizing": {
+      "steps": 15
+    },
+    "inspection-compliance": {
+      "steps": 15
+    },
+    "ui-frontend": {
+      "steps": 15
+    },
+    "backend-infra": {
+      "steps": 20
+    },
+    "test-release": {
+      "steps": 15
+    }
+  }
+}
