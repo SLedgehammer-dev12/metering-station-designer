@@ -25,6 +25,8 @@ COMPONENT_MAP = {
     "ultrasonic": [("inspection_usm.json", "usm_body"), ("inspection_usm.json", "usm_transducers")],
     "turbine":    [("inspection_turbine.json", "turbine_body")],
     "coriolis":   [("inspection_coriolis.json", "coriolis_body")],
+    "vcone":      [("inspection_vcone.json", "vcone_body")],
+    "venturi":    [("inspection_venturi.json", "venturi_body")],
     "vortex":     [],
     "positive_displacement": [],
 }

@@ -1,5 +1,5 @@
 import streamlit as st
-import sys, os
+import sys, os, math
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".."))
 from metering_designer.core.weights import CATEGORY_LABELS_TR
 from metering_designer.piping.wall_thickness import calc_min_wall_thickness, get_od_from_nps, calc_flange_min_class
@@ -12,6 +12,7 @@ from metering_designer.auxiliaries.straight_pipe import calc_straight_pipe
 from metering_designer.auxiliaries.pressure_loss import estimate_permanent_pressure_loss
 from metering_designer.conditioners.scoring import score_all_conditioners, recommend_conditioner
 from metering_designer.fluids.gas import calc_gas_properties
+from metering_designer.auxiliaries.erosional_velocity import check_erosional_velocity
 
 st.header("📐 Detay Mühendislik")
 st.caption("Seçilen metre tipi için detaylı mühendislik hesaplamaları.")
@@ -231,6 +232,18 @@ if "error" not in flange:
     st.metric("Flanş Sınıfı", f"Class {flange.get('flange_class', '?')}#")
 else:
     st.warning(flange.get("error"))
+
+# Erosional velocity check
+if rho_oper > 0 and rho_oper < 1000:
+    D_m = od_mm / 1000
+    A_m2 = math.pi * (D_m / 2) ** 2 if D_m > 0 else 0.01
+    q_act = qmax * rho_std / rho_oper / 3600 if rho_oper > 0 else 0
+    v_act = q_act / A_m2 if A_m2 > 0 else 0
+    erosional = check_erosional_velocity(v_act, rho_oper)
+    if erosional.get("ok") is False:
+        st.warning(f"⚠️ {erosional.get('warning','Erozyonel hız aşıldı')}")
+    else:
+        st.caption(f"✅ Erozyonel Hız: {v_act:.1f} m/s < {erosional.get('v_erosional_m_s',0):.1f} m/s (API RP 14E, C={erosional.get('C_factor','?')})")
 
 st.divider()
 

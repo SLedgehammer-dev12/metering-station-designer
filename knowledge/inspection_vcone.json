@@ -1,0 +1,58 @@
+{
+  "metadata": {"standard": "ISO 5167-5", "version": "1.0"},
+  "components": {
+    "vcone_body": {
+      "name_tr": "V-Koni Metre Gövdesi",
+      "name_en": "V-Cone Meter Body",
+      "standard": "ISO 5167-5",
+      "parameters": {
+        "cone_diameter": {
+          "label_tr": "Koni Çapı (d_vc)",
+          "label_en": "Cone Diameter (d_vc)",
+          "unit": "mm",
+          "points": {"count": 4, "angular": true, "spacing": 45},
+          "tolerance": {"type": "percentage_or_absolute", "percentage": 0.05, "absolute_mm": 0.1, "base_param": "d", "use": "larger"},
+          "clause": "ISO 5167-5 §5.2",
+          "criticality": "CRITICAL",
+          "uncertainty_factor": 0.5
+        },
+        "body_diameter": {
+          "label_tr": "Gövde İç Çapı",
+          "label_en": "Body Internal Diameter",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 0.3, "base_param": "D"},
+          "clause": "ISO 5167-5 §5.1",
+          "criticality": "CRITICAL"
+        },
+        "cone_position": {
+          "label_tr": "Koni Konumu (eksenel)",
+          "label_en": "Cone Position (axial)",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-5 §5.3",
+          "criticality": "MAJOR"
+        },
+        "cone_concentricity": {
+          "label_tr": "Koni Merkezlenmesi",
+          "label_en": "Cone Concentricity",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "percentage", "value": 0.1, "base_param": "D"},
+          "clause": "ISO 5167-5 §5.3",
+          "criticality": "MAJOR"
+        },
+        "surface_roughness": {
+          "label_tr": "Koni Yüzey Pürüzlülüğü",
+          "label_en": "Cone Surface Roughness",
+          "unit": "μm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 3.2},
+          "clause": "ISO 5167-5 §5.4",
+          "criticality": "MINOR"
+        }
+      }
+    }
+  }
+}

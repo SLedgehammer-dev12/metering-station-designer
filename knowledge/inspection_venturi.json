@@ -1,0 +1,66 @@
+{
+  "metadata": {"standard": "ISO 5167-4", "version": "1.0"},
+  "components": {
+    "venturi_body": {
+      "name_tr": "Venturi Metre Gövdesi",
+      "name_en": "Venturi Meter Body",
+      "standard": "ISO 5167-4",
+      "parameters": {
+        "throat_diameter": {
+          "label_tr": "Boğaz Çapı (d)",
+          "label_en": "Throat Diameter (d)",
+          "unit": "mm",
+          "points": {"count": 4, "angular": true, "spacing": 45},
+          "tolerance": {"type": "percentage_or_absolute", "percentage": 0.1, "absolute_mm": 0.1, "base_param": "d", "use": "larger"},
+          "clause": "ISO 5167-4 §5.6",
+          "criticality": "CRITICAL",
+          "uncertainty_factor": 0.5
+        },
+        "inlet_diameter": {
+          "label_tr": "Giriş Çapı (D)",
+          "label_en": "Inlet Diameter (D)",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 0.4, "base_param": "D"},
+          "clause": "ISO 5167-4 §5.2",
+          "criticality": "CRITICAL"
+        },
+        "convergent_profile": {
+          "label_tr": "Konverjan Profil Uygunluğu",
+          "label_en": "Convergent Profile Compliance",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "tolerance": {"type": "enum", "accept": ["profile_ok"], "reject": ["deviation"]},
+          "options": [
+            {"value": "profile_ok", "label_tr": "Profil uygun (şablonla kontrol)", "label_en": "Profile OK (template check)", "status": "PASS"},
+            {"value": "minor_deviation", "label_tr": "Küçük sapma", "label_en": "Minor deviation", "status": "CONDITIONAL"},
+            {"value": "deviation", "label_tr": "Belirgin sapma", "label_en": "Significant deviation", "status": "FAIL"}
+          ],
+          "clause": "ISO 5167-4 §5.3",
+          "criticality": "CRITICAL"
+        },
+        "throat_length": {
+          "label_tr": "Boğaz Uzunluğu",
+          "label_en": "Throat Length",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "range_from_D", "min_factor": 0.3, "max_factor": 1.0},
+          "clause": "ISO 5167-4 §5.5",
+          "criticality": "MAJOR"
+        },
+        "surface_roughness": {
+          "label_tr": "İç Yüzey Pürüzlülüğü",
+          "label_en": "Internal Surface Roughness",
+          "unit": "μm",
+          "points": {"count": 1},
+          "tolerance": {"type": "conditional_max", "conditions": [
+            {"if": {"param": "D", "op": "<=", "value": 200}, "max": 1.6},
+            {"if": {"param": "D", "op": ">", "value": 200}, "max": 3.2}
+          ]},
+          "clause": "ISO 5167-4 §5.8",
+          "criticality": "MAJOR"
+        }
+      }
+    }
+  }
+}
