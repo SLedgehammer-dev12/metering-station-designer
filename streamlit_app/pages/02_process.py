@@ -16,38 +16,57 @@ with col1:
         FLUID_OPTIONS,
         format_func=lambda x: FLUID_LABELS.get(x, x),
         index=FLUID_OPTIONS.index(proc.get("fluid_type", "doğal_gaz")) if proc.get("fluid_type") in FLUID_OPTIONS else 0,
+        help="Ölçülecek akışkan tipi. Hesaplama yöntemini belirler.\n\n"
+             "• Doğal Gaz: Gaz kompozisyonu girmeniz gerekir.\n"
+             "• Ham Petrol: API gravite ve viskozite girmeniz gerekir.",
     )
     proc["fluid_type"] = fluid_type
 
 with col2:
+    service_label = {"custody_transfer": "Custody Transfer (Ticari)", "fiscal": "Fiscal (Resmi)", "process": "Proses Kontrol"}
     service = st.selectbox("Servis Tipi", ["custody_transfer", "fiscal", "process"],
                            index=["custody_transfer", "fiscal", "process"].index(proc.get("service_type", "process"))
-                           if proc.get("service_type") in ["custody_transfer", "fiscal", "process"] else 2)
+                           if proc.get("service_type") in ["custody_transfer", "fiscal", "process"] else 2,
+                           format_func=lambda x: service_label.get(x, x),
+                           help="Ölçümün amacı. Doğruluk gereksinimini belirler.\n\n"
+                                "• Custody Transfer: Alıcı-satıcı arası ticari ölçüm (±%0.5 hassasiyet)\n"
+                                "• Fiscal: Devlet/resmi vergilendirme ölçümü\n"
+                                "• Proses: Tesis içi proses kontrol (±%2 yeterli)")
     proc["service_type"] = service
 with col3:
     nps = st.selectbox("Hat Çapı (NPS)", NPS_OPTIONS,
                        index=NPS_OPTIONS.index(int(proc.get("nps", 8)))
-                           if proc.get("nps") in NPS_OPTIONS else 3)
+                           if proc.get("nps") in NPS_OPTIONS else 3,
+                       help="Nominal Pipe Size — boru çapı (inç cinsinden).\n\n"
+                            "Örnek: NPS 8 ≈ 219 mm dış çap.\n"
+                            "NPS 2 = 60mm | 4 = 114mm | 8 = 219mm | 12 = 324mm | 24 = 610mm")
     proc["nps"] = nps
 
 st.divider()
 col_a, col_b, col_c = st.columns(3)
 with col_a:
-    oper_p = st.number_input("İşletme Basıncı (barg)", min_value=0.1, value=float(proc.get("oper_p_bar", 40.0)), step=1.0)
+    oper_p = st.number_input("İşletme Basıncı (barg)", min_value=0.1, value=float(proc.get("oper_p_bar", 40.0)), step=1.0,
+                             help="Normal çalışma koşullarındaki maksimum beklenen basınç.")
     proc["oper_p_bar"] = oper_p
-    design_p = st.number_input("Tasarım Basıncı (barg)", min_value=0.1, value=float(proc.get("design_p_bar", 50.0)), step=1.0)
+    design_p = st.number_input("Tasarım Basıncı (barg)", min_value=0.1, value=float(proc.get("design_p_bar", 50.0)), step=1.0,
+                                help="Sistemin dayanması gereken maksimum basınç.\nİşletme basıncından büyük veya eşit olmalıdır.")
     proc["design_p_bar"] = design_p
 with col_b:
-    oper_t = st.number_input("İşletme Sıcaklığı (°C)", min_value=-50, max_value=200, value=int(proc.get("oper_t_c", 40)), step=1)
+    oper_t = st.number_input("İşletme Sıcaklığı (°C)", min_value=-50, max_value=200, value=int(proc.get("oper_t_c", 40)), step=1,
+                             help="Normal çalışma sıcaklığı.")
     proc["oper_t_c"] = oper_t
-    design_t = st.number_input("Tasarım Sıcaklığı (°C)", min_value=-50, max_value=200, value=int(proc.get("design_t_c", 60)), step=1)
+    design_t = st.number_input("Tasarım Sıcaklığı (°C)", min_value=-50, max_value=200, value=int(proc.get("design_t_c", 60)), step=1,
+                                help="Sistemin dayanması gereken max/min sıcaklık.\nMalzeme seçimini etkiler.")
     proc["design_t_c"] = design_t
 with col_c:
-    qmin = st.number_input("Q min (Sm³/h)", min_value=0, value=int(proc.get("qmin", 5000)), step=100)
+    qmin = st.number_input("Q min (Sm³/h)", min_value=0, value=int(proc.get("qmin", 5000)), step=100,
+                           help="Minimum debi. Sm³/h = Standart metreküp/saat.\n1 atm, 15°C referans koşullarında hacim.")
     proc["qmin"] = qmin
-    qnormal = st.number_input("Q normal (Sm³/h)", min_value=0, value=int(proc.get("qnormal", 10000)), step=100)
+    qnormal = st.number_input("Q normal (Sm³/h)", min_value=0, value=int(proc.get("qnormal", 10000)), step=100,
+                               help="Normal çalışma debisi.")
     proc["qnormal"] = qnormal
-    qmax = st.number_input("Q max (Sm³/h)", min_value=0, value=int(proc.get("qmax", 30000)), step=100)
+    qmax = st.number_input("Q max (Sm³/h)", min_value=0, value=int(proc.get("qmax", 30000)), step=100,
+                            help="Maksimum debi. Metre seçimini belirleyen en önemli parametredir.")
     proc["qmax"] = qmax
 
 st.divider()
@@ -80,8 +99,13 @@ if fluid_type == "doğal_gaz":
     for i, comp in enumerate(comp_names):
         col = gcols[i % 4]
         default_val = float(proc.get("composition", {}).get(comp, defaults.get(comp, 0)))
-        composition[comp] = col.number_input(comp, min_value=0.0, max_value=100.0,
-                                              value=default_val, step=0.01, format="%.2f")
+        comp_label = {"C1":"C1 — Metan","C2":"C2 — Etan","C3":"C3 — Propan","iC4":"iC4 — izo-Bütan",
+                      "nC4":"nC4 — n-Bütan","iC5":"iC5 — izo-Pentan","nC5":"nC5 — n-Pentan",
+                      "C6":"C6 — Hekzan","C6plus":"C6+ — Ağır HC","N2":"N₂ — Azot","CO2":"CO₂ — Karbondioksit","H2S":"H₂S — Hidrojen Sülfür"}
+        composition[comp] = col.number_input(comp_label.get(comp, comp), min_value=0.0, max_value=100.0,
+                                              value=default_val, step=0.01, format="%.2f",
+                                              help=f"{comp_label.get(comp, comp)} bileşeninin mol yüzdesi.\n"
+                                                   f"Toplam %100 olmalıdır. Tipik doğal gaz: %85-95 Metan.")
     total = sum(composition.values())
     if abs(total - 100) > 0.5:
         st.warning(f"⚠️ Toplam: {total:.2f}% (100% olmalı)")

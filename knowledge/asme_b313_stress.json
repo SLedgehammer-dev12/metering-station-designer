@@ -157,25 +157,185 @@
       "max_temp_C": 400,
       "nace_compliant": "yes_sour_limited"
     },
-    "API_5L_X52": {
-      "name": "API 5L X52 (Line Pipe)",
-      "specification": "API 5L X52",
+    "API_5L_B": {
+      "name": "API 5L B Line Pipe",
+      "specification": "API 5L B PSL2",
       "type": "seamless_or_welded",
-      "min_yield_MPa": 358,
+      "min_yield_MPa": 241,
+      "min_tensile_MPa": 414,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 136,
+        "100": 131,
+        "150": 126,
+        "200": 110,
+        "250": 101,
+        "300": 92,
+        "350": 83,
+        "400": 74
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "yes_below_260C"
+    },
+    "API_5L_X42": {
+      "name": "API 5L X42 Line Pipe",
+      "specification": "API 5L X42 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 290,
+      "min_tensile_MPa": 414,
+      "allowable_stress": {
+        "-29_to_40": 138,
+        "50": 136,
+        "100": 131,
+        "150": 126,
+        "200": 110,
+        "250": 101,
+        "300": 92,
+        "350": 83,
+        "400": 74
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "yes_below_260C"
+    },
+    "API_5L_X46": {
+      "name": "API 5L X46 Line Pipe",
+      "specification": "API 5L X46 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 317,
+      "min_tensile_MPa": 434,
+      "allowable_stress": {
+        "-29_to_40": 145,
+        "50": 143,
+        "100": 137,
+        "150": 132,
+        "200": 116,
+        "250": 106,
+        "300": 96,
+        "350": 87,
+        "400": 78
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "yes_below_260C"
+    },
+    "API_5L_X52": {
+      "name": "API 5L X52 Line Pipe",
+      "specification": "API 5L X52 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 359,
       "min_tensile_MPa": 455,
       "allowable_stress": {
         "-29_to_40": 172,
         "50": 169,
         "100": 163,
         "150": 157,
-        "200": 152,
-        "250": 146,
-        "300": 140,
-        "350": 135,
-        "400": 129
+        "200": 138,
+        "250": 126,
+        "300": 115,
+        "350": 103,
+        "400": 92
       },
       "max_temp_C": 400,
       "nace_compliant": "with_SSC_test"
+    },
+    "API_5L_X56": {
+      "name": "API 5L X56 Line Pipe",
+      "specification": "API 5L X56 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 386,
+      "min_tensile_MPa": 490,
+      "allowable_stress": {
+        "-29_to_40": 163,
+        "50": 160,
+        "100": 154,
+        "150": 148,
+        "200": 130,
+        "250": 119,
+        "300": 108,
+        "350": 98,
+        "400": 87
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "with_SSC_test"
+    },
+    "API_5L_X60": {
+      "name": "API 5L X60 Line Pipe",
+      "specification": "API 5L X60 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 414,
+      "min_tensile_MPa": 517,
+      "allowable_stress": {
+        "-29_to_40": 172,
+        "50": 169,
+        "100": 163,
+        "150": 157,
+        "200": 138,
+        "250": 126,
+        "300": 115,
+        "350": 103,
+        "400": 92
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "with_SSC_test"
+    },
+    "API_5L_X65": {
+      "name": "API 5L X65 Line Pipe",
+      "specification": "API 5L X65 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 448,
+      "min_tensile_MPa": 531,
+      "allowable_stress": {
+        "-29_to_40": 177,
+        "50": 174,
+        "100": 168,
+        "150": 162,
+        "200": 142,
+        "250": 129,
+        "300": 118,
+        "350": 106,
+        "400": 95
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "with_SSC_test"
+    },
+    "API_5L_X70": {
+      "name": "API 5L X70 Line Pipe",
+      "specification": "API 5L X70 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 483,
+      "min_tensile_MPa": 565,
+      "allowable_stress": {
+        "-29_to_40": 188,
+        "50": 185,
+        "100": 178,
+        "150": 171,
+        "200": 150,
+        "250": 137,
+        "300": 125,
+        "350": 113,
+        "400": 101
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "restricted_sour"
+    },
+    "API_5L_X80": {
+      "name": "API 5L X80 Line Pipe",
+      "specification": "API 5L X80 PSL2",
+      "type": "seamless_or_welded",
+      "min_yield_MPa": 552,
+      "min_tensile_MPa": 621,
+      "allowable_stress": {
+        "-29_to_40": 207,
+        "50": 204,
+        "100": 196,
+        "150": 189,
+        "200": 166,
+        "250": 151,
+        "300": 138,
+        "350": 124,
+        "400": 111
+      },
+      "max_temp_C": 400,
+      "nace_compliant": "restricted_sour"
     }
   },
   "schedule_data": {

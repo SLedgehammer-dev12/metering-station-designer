@@ -206,6 +206,10 @@ if "error" not in pipe:
         st.metric("Korozyon Payı Dahil", f"{pipe.get('t_required_mm', 0):.2f} mm")
     with col_c:
         st.metric("Malzeme", material.replace("_", " "))
+    if pipe.get("warning"):
+        st.warning(pipe["warning"])
+    if pipe.get("burst_pressure_bar"):
+        st.caption(f"Patlama Basıncı: {pipe['burst_pressure_bar']:.0f} bar | Malzeme Max Sıcaklık: {pipe.get('material_max_temp_C', '?')}°C")
 
     # Schedule recommendation
     sched = recommend_schedule(nps, pipe.get("t_with_tolerance_mm", pipe.get("t_required_mm", 0)))

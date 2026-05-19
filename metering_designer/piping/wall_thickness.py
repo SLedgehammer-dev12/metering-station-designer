@@ -81,6 +81,17 @@ def calc_min_wall_thickness(
     t_required = tm + CA
     t_with_mill = t_required / (1 - mill_tolerance_pct / 100)
 
+    max_temp = mat.get("max_temp_C", 400)
+    temp_warning = None
+    if design_t_C > max_temp * 0.85:
+        temp_warning = f"Sıcaklık {design_t_C}°C — malzeme limitine yakın (maks {max_temp}°C)"
+    if design_t_C > max_temp:
+        return {"error": f"Tasarım sıcaklığı {design_t_C}°C, {mat.get('name', material)} maksimum sıcaklığını ({max_temp}°C) aşıyor. Malzeme değiştirin."}
+
+    burst_p = 2 * S * t_required / D
+    if burst_p < design_p_bar * 2.5:
+        temp_warning = (temp_warning or "") + f" Patlama basıncı {burst_p:.0f} bar, tasarımın {burst_p/design_p_bar:.1f} katı (min 2.5x önerilir)."
+
     return {
         "material": mat.get("name", material),
         "material_key": material_key,
@@ -94,6 +105,9 @@ def calc_min_wall_thickness(
         "t_required_mm": round(t_required, 3),
         "t_with_tolerance_mm": round(t_with_mill, 3),
         "joint_efficiency": E,
+        "material_max_temp_C": max_temp,
+        "burst_pressure_bar": round(burst_p, 1),
+        "warning": temp_warning,
         "notes": "ASME B31.3 Eq. (3a): tm = P*D/(2*(S*E*W + P*Y))" if standard == "B31.3" else "",
     }
 
