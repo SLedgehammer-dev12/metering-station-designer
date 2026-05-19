@@ -88,7 +88,7 @@ def calc_min_wall_thickness(
     if design_t_C > max_temp:
         return {"error": f"Tasarım sıcaklığı {design_t_C}°C, {mat.get('name', material)} maksimum sıcaklığını ({max_temp}°C) aşıyor. Malzeme değiştirin."}
 
-    burst_p = 2 * S * t_required / D
+    burst_p = 2 * S * t_with_mill / D * 10  # MPa·mm/mm → bar, using tolerance-adjusted thickness
     if burst_p < design_p_bar * 2.5:
         temp_warning = (temp_warning or "") + f" Patlama basıncı {burst_p:.0f} bar, tasarımın {burst_p/design_p_bar:.1f} katı (min 2.5x önerilir)."
 

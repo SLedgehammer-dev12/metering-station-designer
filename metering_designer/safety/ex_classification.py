@@ -102,7 +102,7 @@ def _detect_t_class_from_composition(composition: dict) -> str:
     lowest_comp = None
     for comp, mol in composition.items():
         ait = COMPONENT_AIT.get(comp, 9999)
-        if mol > 0.5 and ait < lowest_ait:
+        if mol > 0.005 and ait < lowest_ait:
             lowest_ait = ait
             lowest_comp = comp
 
