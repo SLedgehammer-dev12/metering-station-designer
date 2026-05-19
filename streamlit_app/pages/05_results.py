@@ -58,7 +58,27 @@ if not results:
     st.error("Değerlendirme sonucu alınamadı.")
     st.stop()
 
-st.success(f"✅ {len(results)} metre tipi değerlendirildi - en yüksek puan: {results[0].name_tr} ({results[0].total_score}/100)")
+st.success(f"✅ {len(results)} metre tipi değerlendirildi — en yüksek puan: {results[0].name_tr} ({results[0].total_score:.0f}/100)")
+
+with st.expander("📖 Bu sonuçlar ne anlama geliyor?", expanded=False):
+    st.markdown("""
+    **Puanlama 0-100 arasındadır. Program 6 kategoride 30'dan fazla kriteri değerlendirir:**
+    
+    | Kategori | Anlamı |
+    |---|---|
+    | 🔧 Teknik Uygunluk | Metre bu akışkan, basınç, çapta çalışabilir mi? |
+    | 🎯 Doğruluk | Ölçüm hatası ne kadar düşük? Custody transfer onaylı mı? |
+    | ⚙️ İşletme Kolaylığı | Basınç kaybı, bakım ihtiyacı, düz boru gereksinimi |
+    | 💰 Maliyet | Yatırım (CAPEX) + işletme (OPEX) maliyeti |
+    | 📦 Uygulanabilirlik | Tedarik süresi, yerel destek, nakliye |
+    | 🔄 Proje Özel | Saha tecrübesi, kompaktlık, online doğrulama |
+    
+    **Tier Sınıflandırması:**
+    - ★★★ (85-100): **Optimal** — En iyi tercih
+    - ★★☆ (70-84): **İyi Alternatif** — Küçük ödünler var
+    - ★☆☆ (50-69): **Değerlendirilebilir** — Ciddi kısıtlamalar
+    - —– (<50): **Önerilmez** — Temel gereksinimleri karşılamıyor
+    """)
 
 st.divider()
 

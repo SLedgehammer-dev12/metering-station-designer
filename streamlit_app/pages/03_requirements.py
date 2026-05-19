@@ -9,10 +9,15 @@ st.caption("Proje özel gereksinimlerini ve standart seçimlerini belirtin.")
 
 col1, col2 = st.columns(2)
 with col1:
-    h2s = st.toggle("Sour Servis (H₂S içeriyor)", value=req.get("h2s", False))
+    h2s = st.toggle("Sour Servis (H₂S içeriyor)", value=req.get("h2s", False),
+                    help="H₂S (hidrojen sülfür) içeren akışkanlarda özel malzeme seçimi gerekir.\n"
+                         "ISO 15156 / NACE MR0175 standardına göre değerlendirme yapılır.")
     req["h2s"] = h2s
     if h2s:
-        h2s_ppm = st.number_input("H₂S Konsantrasyonu (ppm)", min_value=0.0, value=float(req.get("h2s_ppm", 100.0)), step=1.0)
+        h2s_ppm = st.number_input("H₂S Konsantrasyonu (ppm)", min_value=0.0, value=float(req.get("h2s_ppm", 100.0)), step=1.0,
+                                  help="ppm = parts per million (milyonda bir).\n"
+                                       "Sour servis sınırı: > 100 ppm H₂S.\n"
+                                       "Yüksek H₂S (> 5000 ppm) özel malzeme gerektirir.")
         req["h2s_ppm"] = h2s_ppm
     else:
         req["h2s_ppm"] = 0.0
@@ -22,11 +27,18 @@ with col2:
                            ["zone_0", "zone_1", "zone_2", "none"],
                            index=["zone_0", "zone_1", "zone_2", "none"].index(req.get("ex_zone", "zone_2"))
                            if req.get("ex_zone") in ["zone_0", "zone_1", "zone_2", "none"] else 2,
-                           format_func=lambda x: {"zone_0": "Zone 0", "zone_1": "Zone 1",
-                                                   "zone_2": "Zone 2", "none": "Ex gereksiz"}.get(x, x))
+                           format_func=lambda x: {"zone_0": "Zone 0 (Sürekli patlayıcı ortam)",
+                                                   "zone_1": "Zone 1 (Normalde patlayıcı ortam)",
+                                                   "zone_2": "Zone 2 (Nadiren patlayıcı ortam)",
+                                                   "none": "Ex gereksiz"}.get(x, x),
+                           help="IEC 60079-10-1'e göre patlayıcı ortam sınıflandırması.\n"
+                                "Zone 0: Sürekli >1000 saat/yıl\n"
+                                "Zone 1: Muhtemel 10-1000 saat/yıl\n"
+                                "Zone 2: Olağandışı <10 saat/yıl")
     req["ex_zone"] = ex_zone
 
-    has_gas_detection = st.toggle("Gaz Dedektörü Mevcut", value=req.get("has_gas_detection", True))
+    has_gas_detection = st.toggle("Gaz Dedektörü Mevcut", value=req.get("has_gas_detection", True),
+                                   help="Gaz dedektörü varsa Zone sınıfı düşürülebilir.")
     req["has_gas_detection"] = has_gas_detection
 
 st.divider()
@@ -35,7 +47,12 @@ col3, col4 = st.columns(2)
 with col3:
     target_unc = st.select_slider("Hedef Ölçüm Belirsizliği (±%)",
                                    options=[0.1, 0.2, 0.5, 1.0, 1.5, 2.0, 5.0],
-                                   value=float(req.get("target_uncertainty", 1.0)))
+                                   value=float(req.get("target_uncertainty", 1.0)),
+                                   help="Kabul edilebilir maksimum ölçüm hatası.\n\n"
+                                        "±%0.1-0.2: Laboratuvar seviyesi (en yüksek doğruluk)\n"
+                                        "±%0.5: Custody Transfer standardı\n"
+                                        "±%1.0: Endüstriyel ölçüm\n"
+                                        "±%2.0-5.0: Proses kontrol")
     req["target_uncertainty"] = target_unc
     st.caption(f"Seçilen: ±{target_unc}%")
 
