@@ -27,8 +27,16 @@ if errorlevel 1 (
 
 REM --- Build ---
 echo [3/3] Building with PyInstaller (3-5 minutes)...
+
+echo Generating VERSION file...
+python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])" > VERSION
+if errorlevel 1 (
+    echo WARNING: failed to read version from pyproject.toml; building without VERSION.
+)
+
 pyinstaller --onedir --windowed --name MeteringStationDesigner ^
   --add-data "knowledge;knowledge" ^
+  --add-data "VERSION;." ^
   --hidden-import=streamlit --hidden-import=plotly ^
   --hidden-import=numpy --hidden-import=pandas ^
   --hidden-import=pyaga8 --hidden-import=CoolProp ^

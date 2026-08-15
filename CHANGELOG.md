@@ -2,6 +2,16 @@
 
 All notable changes to Metering Station Designer.
 
+## [1.2.0] - 2026-08-15
+
+### Platform-Aware Releases & macOS Support
+- **macOS build** in `.github/workflows/build.yml`: `build-macos` job runs on `macos-latest` (Apple Silicon, arm64), produces `MeteringStationDesigner_macOS_arm64.zip` with ad-hoc `codesign --force --deep -s -` and uploads it to the release alongside the Windows zip.
+- **Per-platform release tags**: `v1.2.0` (both platforms), `v1.2.0-win` (Windows only), `v1.2.0-mac` (macOS only). Each build job is gated with `if: contains(github.ref, '-mac'/' -win')` so a single-platform fix only rebuilds that platform.
+- **Asset-aware update check** (`core/updates.py`): `fetch_releases()` + `find_platform_release()` scan recent releases and only signal an update when the newest release ships an artifact for the *running* OS. A Windows-only release no longer notifies macOS users and vice-versa; per-OS version tracks stay independent. Deprecated reliance on the global `releases/latest` tag for update decisions.
+- **Packaged app version detection**: frozen builds now embed a `VERSION` file (`--add-data "VERSION;."`/`"VERSION:."`) which `get_app_version()` reads from `sys._MEIPASS` before falling back to package metadata / `pyproject.toml`.
+- **Semi-automatic download**: the update banner offers a platform download button (`start_download()`), streams the matching asset with progress, verifies SHA-256 against the GitHub asset digest, and shows OS-specific replace instructions (`update_replace_mac` / `update_replace_windows`).
+- New i18n keys (TR + EN): `update_download_btn`, `update_downloading`, `update_download_done`, `update_download_verified`, `update_download_failed`, `update_replace_mac`, `update_replace_windows`, `update_no_asset`.
+
 ## [1.1.0] - 2026-08-15
 
 ### Automatic Update Check

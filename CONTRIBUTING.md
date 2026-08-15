@@ -72,3 +72,26 @@ streamlit run streamlit_app/app.py    # test UI
 3. PR to `main` with all feature branches
 4. `git tag v<version>` after merge
 5. GitHub Actions builds Windows .exe + uploads to Release tab
+
+### Per-Platform Releases
+
+A single base version can be released for both platforms or for only one. The
+tag suffix selects which platforms get a new package:
+
+| Tag | Builds | Assets |
+|-----|--------|--------|
+| `v1.2.0` | Windows + macOS | `MeteringStationDesigner_Windows.zip`, `MeteringStationDesigner_macOS_arm64.zip` |
+| `v1.2.0-win` | Windows only | `MeteringStationDesigner_Windows.zip` |
+| `v1.2.0-mac` | macOS only | `MeteringStationDesigner_macOS_arm64.zip` |
+
+Rules:
+- Any platform release bumps the base version in `pyproject.toml` (minor/patch); the
+  suffix only says *where* the change applies.
+- Tags must be pushed as a *non-draft, non-prerelease* GitHub Release so the
+  asset upload steps can attach binaries to them.
+- The in-app update check is asset-aware: each OS only reports an update when the
+  newest release actually ships an artifact for it (`core/updates.py` →
+  `find_platform_release`). A `-mac` release therefore does *not* notify Windows
+  users, and vice-versa.
+- Create the release before/at push time so `Build Release` can upload:
+  `gh release create v1.2.0-mac --title "v1.2.0 (macOS only)" --notes "…"`

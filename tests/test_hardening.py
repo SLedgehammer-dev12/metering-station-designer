@@ -600,11 +600,22 @@ def test_compare_versions_garbage_never_newer():
     assert compare_versions("1.0.0", None) is False
 
 
-def test_check_in_background_caches_result_and_never_blocks():
+def test_check_in_background_caches_result_and_never_blocks(monkeypatch):
+    from metering_designer.core import updates
     from metering_designer.core.updates import check_in_background, reset_check_cache
 
+    releases = [{
+        "tag_name": "v9.9.9",
+        "assets": [{
+            "name": "MeteringStationDesigner_macOS_arm64.zip",
+            "browser_download_url": "https://example.invalid/app.zip",
+            "digest": "sha256:abcd",
+        }],
+    }]
+    monkeypatch.setattr(updates, "fetch_releases", lambda *a, **k: releases)
+
     reset_check_cache()
-    first = check_in_background()
+    first = check_in_background(platform="darwin")
     # While a check is in flight we must get a usable (non-blocking) dict back.
     assert isinstance(first, dict)
     assert "update_available" in first
@@ -614,26 +625,35 @@ def test_check_in_background_caches_result_and_never_blocks():
     deadline = time.time() + 10
     done = False
     while time.time() < deadline:
-        res = check_in_background()
+        res = check_in_background(platform="darwin")
         if res.get("latest") is not None or res.get("error") is not None:
             done = True
             break
-        time.sleep(0.15)
+        time.sleep(0.05)
     reset_check_cache()
     assert done, "background update check never completed"
 
 
 def test_check_in_background_offline_degrades_gracefully(monkeypatch):
+    import time
+
     from metering_designer.core import updates
     from metering_designer.core.updates import check_in_background, reset_check_cache
 
     def _boom(*a, **k):
         raise OSError("no network")
 
-    monkeypatch.setattr(updates, "fetch_latest_release_tag", _boom)
+    monkeypatch.setattr(updates, "fetch_releases", _boom)
     reset_check_cache()
     res = check_in_background()
     # Offline still returns a usable dict; the app must not crash.
     assert isinstance(res, dict)
     assert res.get("update_available") in (True, False)
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        res = check_in_background()
+        if res.get("error") is not None:
+            break
+        time.sleep(0.05)
+    assert res.get("error") is not None
     reset_check_cache()

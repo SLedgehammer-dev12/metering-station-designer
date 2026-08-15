@@ -33,14 +33,38 @@ st.sidebar.markdown(get_text("app_phase_desc", lang))
 st.sidebar.markdown("---")
 
 # Automatic update check (runs once per process; result cached)
-from metering_designer.core.updates import check_in_background, get_app_version
+from metering_designer.core.updates import (
+    check_in_background,
+    get_app_version,
+    get_download_state,
+    start_download,
+)
 
 _app_version = get_app_version()
 _update = check_in_background()
+_dl = get_download_state()
 if _update.get("update_available"):
     _v = _update.get("latest", "")
+    _asset = _update.get("platform_asset") or {}
     with st.sidebar.expander(f":rocket: {get_text('update_available', lang).format(v=_v)}", expanded=True):
-        st.markdown(get_text("update_instruction", lang))
+        if _dl.get("status") == "running":
+            st.progress(_dl.get("progress", 0.0))
+            st.caption(get_text("update_downloading", lang).format(pct=100 * _dl.get("progress", 0.0)))
+        elif _dl.get("status") == "done":
+            st.success(get_text("update_download_done", lang).format(path=_dl.get("dest", "")))
+            if _dl.get("sha_ok"):
+                st.info(get_text("update_download_verified", lang))
+            import sys as _sys
+            st.markdown(get_text("update_replace_mac" if _sys.platform == "darwin" else "update_replace_windows", lang))
+        elif _dl.get("status") == "failed":
+            st.error(get_text("update_download_failed", lang).format(error=_dl.get("error", "")))
+        else:
+            if _asset.get("browser_download_url"):
+                if st.button(get_text("update_download_btn", lang).format(v=_v), key="update_download_btn"):
+                    start_download()
+                    st.rerun()
+            else:
+                st.info(get_text("update_no_asset", lang))
     st.sidebar.success(f"{get_text('app_version', lang)}: v{_app_version}")
 elif _update.get("error") is None and _update.get("latest"):
     st.sidebar.caption(f"{get_text('app_version', lang)}: v{_app_version} · {get_text('update_latest', lang).format(v=_update['latest'])}")
