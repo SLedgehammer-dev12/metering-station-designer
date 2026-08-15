@@ -393,7 +393,7 @@ def test_i18n_full_coverage():
 # ─────────────────────────────────────────────
 def _build_app_test(session_state):
     from streamlit.testing.v1 import AppTest
-    at = AppTest.from_file("streamlit_app/app.py", default_timeout=90)
+    at = AppTest.from_file(os.path.join(ROOT, "streamlit_app", "app.py"), default_timeout=90)
     for k, v in session_state.items():
         at.session_state[k] = v
     at.run()

@@ -37,53 +37,79 @@ def test_vortex_sizing():
 def test_pdf_report():
     if not HAS_REPORTLAB:
         return
-    SMock = namedtuple('SMock', ['meter_key','name_tr','name_en','total_score','tier_label','tier_color','categories','strengths','weaknesses','details'])
-    CatMock = namedtuple('CatMock', ['score','weight','criteria'])
-    CritMock = namedtuple('CritMock', ['name','score','weight','justification'])
-    cat = dict.fromkeys(['technical_fitness','accuracy_metrology','operational_ease','cost','implementability','project_specific'],
-                          CatMock(8.0, 0.15, []))
-    sm = SMock('ultrasonic', 'USM', 'USM', 78.5, '★★☆', 'blue', cat, ['Strong'], ['Weak'], {})
-    buf = generate_pdf_report({'name':'T','location':'L'}, {}, {}, sm, {}, [])
-    raw = buf.getvalue()
-    assert len(raw) > 1000
-    # Verify PDF header
-    assert b'%PDF-' in raw, "Missing PDF header"
-    # Decode content streams to verify text content
-    decoded_text = _extract_pdf_text(raw)
-    # Content assertions
-    assert "Proje:" in decoded_text, f"Expected 'Proje:' in PDF, got snippet: {decoded_text[:300]}"
-    assert "Konum:" in decoded_text, "Expected 'Konum:' (Location) in PDF"
-    # Station name and meter name should appear
-    assert "T" in decoded_text, "Expected station name 'T' in PDF"
-    assert "USM" in decoded_text, "Expected meter name 'USM' in PDF"
-    # Process summary should contain key terms
-    assert "Proses" in decoded_text, "Expected process summary in PDF"
-    # Standards section
-    assert "ASME" in decoded_text or "ISO" in decoded_text, "Expected standards references in PDF"
+    import tempfile
+    data = {
+        "meter_type": "USM",
+        "standard_ref": "ISO 5167 / AGA 9",
+        "pressure": 40.0,
+        "temperature": 20.0,
+        "flow_max": 1000.0,
+        "flow_min": 100.0,
+        "density_op": 30.0,
+        "viscosity": 1.2e-5,
+        "z_factor": 0.9,
+        "sizing_results": {"beta": 0.5, "Cd": 0.603, "d_mm": 50.0},
+        "uncertainty_components": [
+            {"name": "meter", "value_pct": 0.6, "type": "B", "distribution": "normal"},
+        ],
+        "combined_uncertainty": 0.65,
+        "expanded_k2": 1.30,
+        "gas_properties": {"M_mix": 18.5, "rho_std_kg_m3": 0.8},
+        "notes": ["Test note 1", "Test note 2"],
+        "schematic_png_b64": "QUJD",
+        "instrument_table_rows": [
+            {"tag": "PT-1001", "type": "pressure", "count": 1,
+             "position_D": -2.0, "side": "Upstream", "standard": "ISO 5167-1"},
+        ],
+    }
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+        out = f.name
+    try:
+        result = generate_pdf_report(data, out)
+        assert os.path.exists(result), f"PDF was not created at {result}"
+        assert os.path.getsize(result) > 1000, "PDF file too small"
+        with open(out, "rb") as fh:
+            raw = fh.read()
+        assert b"%PDF-" in raw, "Missing PDF header"
+        decoded_text = _extract_pdf_text(raw)
+        assert "USM" in decoded_text, f"Expected meter name 'USM' in PDF, got: {decoded_text[:300]}"
+        assert "ISO" in decoded_text or "ASME" in decoded_text, "Expected standards references in PDF"
+    finally:
+        try:
+            os.unlink(out)
+        except OSError:
+            pass
 
 
 def _extract_pdf_text(raw: bytes) -> str:
-    """Extract readable text from PDF content streams (ASCII85 + FlateDecode)."""
+    """Extract readable text from PDF content streams.
+
+    Handles FlateDecode streams that may be stored raw, ASCII85+Flate, or
+    uncompressed. Returns a best-effort concatenation of decoded text chunks.
+    """
     import re, zlib, base64
     parts = []
-    pat = re.compile(
-        rb'/Filter\s*\[.*?ASCII85Decode.*?FlateDecode.*?\].*?/Length\s+(\d+).*?>>\s*\nstream\n(.*?)endstream',
-        re.DOTALL)
-    for m in pat.finditer(raw):
-        length = int(m.group(1))
-        stream_raw = m.group(2).rstrip(b'\r\n')[:length]
+    for m in re.finditer(rb'stream\r?\n(.*?)endstream', raw, re.DOTALL):
+        block = m.group(1).rstrip(b'\r\n')
+        candidates = [block]
         try:
-            decoded = base64.a85decode(stream_raw, adobe=True)
-            decompressed = zlib.decompress(decoded)
-            parts.append(decompressed.decode('latin-1', errors='replace'))
+            # ascii85-wrap if separator present
+            sep = block.rfind(b'~>')
+            a85 = (block[:sep + 2] if sep != -1 else block)
+            candidates.append(base64.a85decode(a85, adobe=True))
         except Exception:
             try:
-                # Try with adobe end marker
-                decoded = base64.a85decode(stream_raw + b'~>', adobe=True)
-                decompressed = zlib.decompress(decoded)
-                parts.append(decompressed.decode('latin-1', errors='replace'))
+                candidates.append(base64.a85decode(block + b'~>', adobe=True))
             except Exception:
                 pass
+        for cand in candidates:
+            for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
+                try:
+                    out = zlib.decompress(cand, wbits)
+                    parts.append(out.decode('latin-1', errors='replace'))
+                    break
+                except Exception:
+                    continue
     return '\n'.join(parts)
 
 
