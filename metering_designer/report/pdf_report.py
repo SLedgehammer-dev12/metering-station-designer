@@ -1,286 +1,339 @@
 """
-PDF report generation using reportlab.
-3-page summary engineering report for metering station design.
+WeasyPrint-based PDF report generator (Phase C4).
+Generates professional PDF reports from metering calculation data.
 """
 
-import io
-import os
-from typing import Optional
+import datetime
+from pathlib import Path
+
 
 try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.colors import HexColor, black, white
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-    from reportlab.lib.units import mm, cm
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        PageBreak, HRFlowable,
-    )
-    from reportlab.platypus.flowables import KeepTogether
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
+    import weasyprint
+    HAS_WEASYPRINT = True
+except (ImportError, OSError):
+    HAS_WEASYPRINT = False
+
+
+# HTML template for metering station design report
+REPORT_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {{
+    size: A4;
+    margin: 2cm;
+    @top-center {{
+      content: "Metering Station Design Report";
+      font-size: 9pt;
+      color: #666;
+    }}
+    @bottom-center {{
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 8pt;
+      color: #666;
+    }}
+  }}
+  body {{ font-family: 'DejaVu Sans', sans-serif; font-size: 10pt; color: #333; }}
+  h1 {{ font-size: 18pt; color: #1a5276; border-bottom: 2px solid #1a5276; padding-bottom: 4px; }}
+  h2 {{ font-size: 14pt; color: #2e86c1; margin-top: 20px; }}
+  h3 {{ font-size: 12pt; color: #2471a3; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
+  th, td {{ padding: 6px 8px; text-align: left; border: 1px solid #ddd; }}
+  th {{ background-color: #1a5276; color: white; font-weight: bold; }}
+  tr:nth-child(even) {{ background-color: #f2f2f2; }}
+  .header {{ text-align: center; margin-bottom: 20px; }}
+  .header h1 {{ border: none; margin-bottom: 5px; }}
+  .header p {{ color: #666; font-size: 9pt; }}
+  .summary {{ background: #eaf2f8; padding: 12px; border-radius: 4px; margin: 10px 0; }}
+  .schematic {{ text-align: center; margin: 10px 0; }}
+  .schematic img {{ max-width: 100%; border: 1px solid #ddd; border-radius: 4px; }}
+  .schematic p {{ font-size: 9pt; color: #666; }}
+  .warning {{ color: #e74c3c; font-weight: bold; }}
+  .ok {{ color: #27ae60; font-weight: bold; }}
+  .footer {{ margin-top: 30px; font-size: 8pt; color: #999; text-align: center; }}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Metering Station Design Report</h1>
+  <p>Generated: {generated_at}</p>
+</div>
+
+<h2>1. {sec_project}</h2>
+<table>
+  <tr><th>{prop}</th><th>{value}</th></tr>
+  <tr><td>{report_date}</td><td>{generated_at}</td></tr>
+  <tr><td>{meter_type}</td><td>{meter_type_val}</td></tr>
+  <tr><td>{standard_ref}</td><td>{standard_ref_val}</td></tr>
+</table>
+
+<h2>2. {sec_conditions}</h2>
+<table>
+  <tr><th>{param}</th><th>{value}</th><th>{unit}</th></tr>
+  <tr><td>{op_pressure}</td><td>{pressure}</td><td>bar(g)</td></tr>
+  <tr><td>{op_temperature}</td><td>{temperature}</td><td>°C</td></tr>
+  <tr><td>{flow_max}</td><td>{flow_max_val}</td><td>Sm³/h</td></tr>
+  <tr><td>{flow_min}</td><td>{flow_min_val}</td><td>Sm³/h</td></tr>
+  <tr><td>{density_op}</td><td>{density_op_val}</td><td>kg/m³</td></tr>
+  <tr><td>{viscosity}</td><td>{viscosity_val}</td><td>Pa·s</td></tr>
+  <tr><td>{compressibility}</td><td>{z_factor}</td><td>—</td></tr>
+</table>
+
+<h2>3. {sec_sizing}</h2>
+<table>
+  <tr><th>{param}</th><th>{value}</th><th>{unit}</th></tr>
+  {sizing_rows}
+</table>
+
+<h2>4. {sec_uncertainty}</h2>
+<table>
+  <tr><th>{component}</th><th>{value_pct}</th><th>{type}</th><th>{distribution}</th></tr>
+  {uncertainty_rows}
+</table>
+<div class="summary">
+  <strong>{combined_std}:</strong> {combined_uncertainty} %<br>
+  <strong>{expanded_k2}:</strong> {expanded_k2_val} %
+</div>
+
+<h2>5. {sec_gas_props}</h2>
+<table>
+  <tr><th>{property}</th><th>{value}</th><th>{unit}</th></tr>
+  {gas_rows}
+</table>
+
+{schematic_section}
+
+<h2>6. {sec_notes}</h2>
+{notes_section}
+
+<div class="footer">
+  <p>Metering Station Designer — Automatically Generated Report</p>
+  <p>This report is for reference purposes. Final design must be verified by a qualified engineer.</p>
+</div>
+</body>
+</html>
+"""
 
 
 def generate_pdf_report(
-    project: dict,
-    process: dict,
-    requirements: dict,
-    selected_meter,
-    engineering: dict,
-    conditioners: Optional[list] = None,
-    language: str = "tr",
-) -> io.BytesIO:
-    if not HAS_REPORTLAB:
-        raise ImportError("reportlab gereklidir: pip install reportlab")
+    data: dict,
+    output_path: str | Path = "metering_report.pdf",
+    lang: str = "tr",
+) -> str:
+    """Generate a PDF report from metering calculation data.
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        leftMargin=20*mm, rightMargin=20*mm,
-        topMargin=15*mm, bottomMargin=15*mm,
-    )
+    Args:
+        data: Dictionary with keys:
+            - meter_type: str
+            - standard_ref: str (e.g., "ISO 5167-2:2003 / AGA 3")
+            - pressure: float (bar)
+            - temperature: float (°C)
+            - flow_max: float (Sm³/h)
+            - flow_min: float (Sm³/h)
+            - density_op: float (kg/m³)
+            - viscosity: float (Pa·s)
+            - z_factor: float
+            - sizing_results: dict (key-value pairs for the sizing table)
+            - uncertainty_components: list[dict]
+            - combined_uncertainty: float (%)
+            - expanded_k2: float (%)
+            - gas_properties: dict
+            - notes: list[str]
+            - schematic_png_b64: str (optional, base64 PNG)
+            - instrument_table_rows: list[dict] (optional)
+            - straight_pipe: dict (optional)
+        output_path: Path to save the PDF file.
+        lang: "tr" or "en" for report section labels.
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("CustomTitle", parent=styles["Title"], fontSize=16, spaceAfter=6*mm, textColor=HexColor("#1F4E79"))
-    h2_style = ParagraphStyle("CustomH2", parent=styles["Heading2"], fontSize=13, spaceBefore=5*mm, spaceAfter=3*mm, textColor=HexColor("#1F4E79"))
-    h3_style = ParagraphStyle("CustomH3", parent=styles["Heading3"], fontSize=11, spaceBefore=3*mm, spaceAfter=2*mm)
-    body_style = ParagraphStyle("CustomBody", parent=styles["Normal"], fontSize=9.5, spaceAfter=2*mm, leading=13)
-    small_style = ParagraphStyle("Small", parent=styles["Normal"], fontSize=8, spaceAfter=1*mm, leading=10)
-    header_style = ParagraphStyle("Header", fontSize=8, textColor=HexColor("#666666"))
+    Returns:
+        Absolute path to generated PDF file, or error message string.
+    """
+    if not HAS_WEASYPRINT:
+        msg = "WeasyPrint is not installed. Install with: pip install weasyprint"
+        return msg
 
-    story = []
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # --- PAGE 1: Cover / Summary ---
-    story.append(Paragraph("ÖLÇÜM İSTASYONU DİZAYN RAPORU", title_style))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=HexColor("#1F4E79")))
-    story.append(Spacer(1, 5*mm))
+    # Sizing rows
+    sizing_items = data.get("sizing_results", {})
+    sizing_rows = ""
+    for key, val in sizing_items.items():
+        if isinstance(val, float):
+            val_str = f"{val:.4f}"
+        else:
+            val_str = str(val)
+        sizing_rows += f"<tr><td>{key}</td><td>{val_str}</td><td>—</td></tr>\n"
 
-    proj_name = project.get("name", "-") or project.get("name", "-")
-    proj_loc = project.get("location", "-") or project.get("location", "-")
+    # Uncertainty rows
+    uncertainty_components = data.get("uncertainty_components", [])
+    uncertainty_rows = ""
+    for comp in uncertainty_components:
+        uncertainty_rows += (
+            f"<tr><td>{comp.get('name', '')}</td>"
+            f"<td>{comp.get('value_pct', 0):.4f}</td>"
+            f"<td>{comp.get('type', '')}</td>"
+            f"<td>{comp.get('distribution', '')}</td></tr>\n"
+        )
 
-    info_data = [
-        [Paragraph("<b>Proje:</b>", body_style), Paragraph(str(proj_name), body_style)],
-        [Paragraph("<b>Konum:</b>", body_style), Paragraph(str(proj_loc), body_style)],
-        [Paragraph("<b>Akışkan:</b>", body_style), Paragraph(str(process.get("fluid_type", "-")), body_style)],
-        [Paragraph("<b>Servis Tipi:</b>", body_style), Paragraph(str(process.get("service_type", "-")), body_style)],
-    ]
-    info_table = Table(info_data, colWidths=[40*mm, 120*mm])
-    info_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
-    story.append(info_table)
+    # Gas properties rows
+    gas_items = data.get("gas_properties", {})
+    gas_rows = ""
+    for key, val in gas_items.items():
+        if isinstance(val, float):
+            val_str = f"{val:.4f}"
+        else:
+            val_str = str(val)
+        gas_rows += f"<tr><td>{key}</td><td>{val_str}</td><td>—</td></tr>\n"
 
-    story.append(Spacer(1, 8*mm))
-    story.append(Paragraph(f"<b>SEÇİLEN METRE: {selected_meter.name_tr}</b>", h2_style))
-    story.append(Paragraph(f"Toplam Puan: <b>{selected_meter.total_score:.0f}/100</b> ({selected_meter.tier_label})", body_style))
+    # Notes section
+    notes = data.get("notes", [])
+    if notes:
+        notes_html = "<ul>\n"
+        for note in notes:
+            notes_html += f"  <li>{note}</li>\n"
+        notes_html += "</ul>\n"
+    else:
+        notes_html = "<p>No warnings.</p>\n"
 
-    # Process summary table
-    story.append(Spacer(1, 5*mm))
-    story.append(Paragraph("Proses Özeti", h3_style))
-    proc_data = [
-        ["Parametre", "Değer", "Birim"],
-        ["Q min", str(process.get("qmin", "-")), "Sm³/h" if "gas" in str(process.get("fluid_type","")) else "m³/h"],
-        ["Q normal", str(process.get("qnormal", "-")), "Sm³/h" if "gas" in str(process.get("fluid_type","")) else "m³/h"],
-        ["Q max", str(process.get("qmax", "-")), "Sm³/h" if "gas" in str(process.get("fluid_type","")) else "m³/h"],
-        ["P işletme", str(process.get("oper_p_bar", "-")), "barg"],
-        ["T işletme", str(process.get("oper_t_c", "-")), "°C"],
-        ["P tasarım", str(process.get("design_p_bar", "-")), "barg"],
-        ["T tasarım", str(process.get("design_t_c", "-")), "°C"],
-        ["NPS", str(process.get("nps", "-")), "\""],
-    ]
-    proc_table = Table(proc_data, colWidths=[40*mm, 35*mm, 40*mm])
-    proc_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, HexColor("#F0F4F8")]),
-    ]))
-    story.append(proc_table)
+    # Schematic section (optional base64 PNG embedded in <img>)
+    schematic_html = ""
+    png_b64 = data.get("schematic_png_b64")
+    if png_b64:
+        title = "Layout Schematic (SFG)" if lang != "tr" else "Yerleşim Şeması (SFG)"
+        schematic_html = (
+            f'<h2 style="margin-top:24px;">{title}</h2>\n'
+            f'<div class="schematic"><img alt="schematic" '
+            f'src="data:image/png;base64,{png_b64}"/></div>\n'
+        )
+    inst_rows_html = ""
+    inst_rows = data.get("instrument_table_rows", [])
+    if inst_rows:
+        t_tag = "Tag" if lang != "tr" else "Etiket"
+        t_type = "Type" if lang != "tr" else "Tip"
+        t_count = "Count" if lang != "tr" else "Adet"
+        t_pos = "Pos (D)" if lang != "tr" else "Konum (D)"
+        t_side = "Side" if lang != "tr" else "Taraf"
+        t_std = "Standard" if lang != "tr" else "Standart"
+        for r in inst_rows:
+            inst_rows_html += (
+                f"<tr><td>{r.get('tag_list','')}</td><td>{r.get('type','')}</td>"
+                f"<td>{r.get('count','')}</td><td>{r.get('position_D','')}</td>"
+                f"<td>{r.get('side','')}</td><td>{r.get('standard','')}</td></tr>\n"
+            )
+        schematic_html += (
+            f'<h3 style="margin-top:10px;">{"Instruments" if lang != "tr" else "Enstrümanlar"}</h3>\n'
+            f"<table><tr><th>{t_tag}</th><th>{t_type}</th><th>{t_count}</th>"
+            f"<th>{t_pos}</th><th>{t_side}</th><th>{t_std}</th></tr>\n"
+            f"{inst_rows_html}</table>\n"
+        )
 
-    # Category scores
-    story.append(Spacer(1, 6*mm))
-    story.append(Paragraph("Kategori Puanları", h3_style))
+    # Section labels by language
+    L = {
+        "tr": {
+            "sec_project": "Proje Bilgisi",
+            "sec_conditions": "İşletme Koşulları",
+            "sec_sizing": "Metre Boyutlandırma Sonuçları",
+            "sec_uncertainty": "Belirsizlik Bütçesi",
+            "sec_gas_props": "Gaz Özellikleri",
+            "sec_notes": "Notlar & Uyarılar",
+            "prop": "Özellik", "value": "Değer", "unit": "Birim",
+            "report_date": "Rapor Tarihi", "meter_type": "Metre Tipi",
+            "standard_ref": "Standart Referansı", "param": "Parametre",
+            "op_pressure": "İşletme Basıncı", "op_temperature": "İşletme Sıcaklığı",
+            "flow_max": "Debi (max)", "flow_min": "Debi (min)",
+            "density_op": "Yoğunluk (işletme)", "viscosity": "Viskozite",
+            "compressibility": "Sıkıştırılabilirlik (Z)",
+            "component": "Bileşen", "value_pct": "Değer (±%)", "type": "Tip",
+            "distribution": "Dağılım", "combined_std": "Birleşik Standart Belirsizlik:",
+            "expanded_k2": "Genişletilmiş Belirsizlik (k=2, %95):", "property": "Özellik",
+        },
+        "en": {
+            "sec_project": "Project Information",
+            "sec_conditions": "Operating Conditions",
+            "sec_sizing": "Meter Sizing Results",
+            "sec_uncertainty": "Uncertainty Budget",
+            "sec_gas_props": "Gas Properties",
+            "sec_notes": "Notes & Warnings",
+            "prop": "Property", "value": "Value", "unit": "Unit",
+            "report_date": "Report Date", "meter_type": "Meter Type",
+            "standard_ref": "Standard Reference", "param": "Parameter",
+            "op_pressure": "Operating Pressure", "op_temperature": "Operating Temperature",
+            "flow_max": "Flow Rate (max)", "flow_min": "Flow Rate (min)",
+            "density_op": "Density (operating)", "viscosity": "Viscosity",
+            "compressibility": "Compressibility (Z)",
+            "component": "Component", "value_pct": "Value (±%)", "type": "Type",
+            "distribution": "Distribution", "combined_std": "Combined Standard Uncertainty:",
+            "expanded_k2": "Expanded Uncertainty (k=2, 95%):", "property": "Property",
+        },
+    }[lang if lang in ("tr", "en") else "tr"]
 
-    from metering_designer.core.weights import CATEGORY_LABELS_TR
-    score_data = [["Kategori", "Puan (/10)", "Ağırlık (%)"]]
-    for ck, cl in CATEGORY_LABELS_TR.items():
-        cat = selected_meter.categories.get(ck)
-        if cat:
-            score_data.append([cl, f"{cat.score:.1f}", f"%{cat.weight*100:.0f}"])
-    score_data.append(["TOPLAM", f"{selected_meter.total_score:.0f}/100", "100%"])
+    fmt = dict({
+        "generated_at": now,
+        "meter_type_val": data.get("meter_type", "N/A"),
+        "standard_ref_val": data.get("standard_ref", "N/A"),
+        "pressure": data.get("pressure", "N/A"),
+        "temperature": data.get("temperature", "N/A"),
+        "flow_max_val": data.get("flow_max", "N/A"),
+        "flow_min_val": data.get("flow_min", "N/A"),
+        "density_op_val": data.get("density_op", "N/A"),
+        "viscosity_val": data.get("viscosity", "N/A"),
+        "z_factor": data.get("z_factor", "N/A"),
+        "sizing_rows": sizing_rows,
+        "uncertainty_rows": uncertainty_rows,
+        "combined_uncertainty": data.get("combined_uncertainty", "N/A"),
+        "expanded_k2_val": data.get("expanded_k2", "N/A"),
+        "gas_rows": gas_rows,
+        "notes_section": notes_html,
+        "schematic_section": schematic_html,
+    })
+    fmt.update(L)
 
-    score_table = Table(score_data, colWidths=[60*mm, 40*mm, 40*mm])
-    score_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("BACKGROUND", (0, -1), (-1, -1), HexColor("#E8EEF4")),
-        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-    ]))
-    story.append(score_table)
+    html = REPORT_TEMPLATE.format(**fmt)
 
-    # --- PAGE 2: Engineering Details ---
-    story.append(PageBreak())
-    story.append(Paragraph("DETAY MÜHENDİSLİK HESAPLARI", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=HexColor("#1F4E79")))
+    try:
+        doc = weasyprint.HTML(string=html)
+        output_path = Path(output_path).resolve()
+        doc.write_pdf(str(output_path))
+        return str(output_path)
+    except Exception as e:
+        return f"PDF generation failed: {e}"
 
-    # Piep design
-    pipe = engineering.get("pipe", {})
-    sched = engineering.get("schedule", {})
-    if pipe and "error" not in pipe:
-        story.append(Paragraph("Boru Tasarımı (ASME B31.3)", h3_style))
-        pd_data = [
-            ["Parametre", "Değer"],
-            ["Dış Çap", f"{pipe.get('od_mm', '-')} mm"],
-            ["Malzeme", str(pipe.get("material", "-"))],
-            ["Min Et Kalınlığı", f"{pipe.get('t_min_pressure_mm', '-')} mm"],
-            ["Korozyon Payı Dahil", f"{pipe.get('t_required_mm', '-')} mm"],
-            ["Tolerans Dahil", f"{pipe.get('t_with_tolerance_mm', '-')} mm"],
-        ]
-        if sched.get("recommended"):
-            pd_data.append(["Önerilen Schedule", f"{sched['recommended']['schedule_name']} ({sched['recommended']['wall_mm']} mm)"])
-        pd_table = Table(pd_data, colWidths=[60*mm, 60*mm])
-        pd_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#2E7D32")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), white),
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(pd_table)
 
-    # Meter sizing
-    md = engineering.get("meter_details", {})
-    if md:
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph(f"Metre Boyutlandırma ({selected_meter.name_tr})", h3_style))
-        md_keys = list(md.keys())[:8]
-        md_data = [["Parametre", "Değer"]]
-        for k in md_keys:
-            if k not in ("notes", "sizing_note"):
-                md_data.append([k.replace("_", " ").title(), str(md[k])])
-        if len(md_data) > 1:
-            md_table = Table(md_data, colWidths=[60*mm, 60*mm])
-            md_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#E65100")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), white),
-                ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ]))
-            story.append(md_table)
-
-    # Ex / SIL
-    ex = engineering.get("ex", {})
-    sil = engineering.get("sil", {})
-    unc = engineering.get("uncertainty", {})
-    if ex:
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph("Emniyet & Metroloji", h3_style))
-        safety_data = [["Parametre", "Değer"]]
-        if ex: safety_data.append(["Ex Zone", str(ex.get("zone", "-"))])
-        if ex: safety_data.append(["Gaz Grubu", str(ex.get("gas_group", "-"))])
-        if sil: safety_data.append(["SIL", str(sil.get("sil_rating", "-"))])
-        if unc: safety_data.append(["Belirsizlik (k=2)", f"±{unc.get('expanded_uncertainty_k2_95pct', '-')}%"])
-        safety_table = Table(safety_data, colWidths=[60*mm, 60*mm])
-        safety_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#C62828")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), white),
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(safety_table)
-
-    # Flow conditioner
-    if conditioners and len(conditioners) > 0:
-        story.append(Spacer(1, 5*mm))
-        story.append(Paragraph("Akış Düzenleyici Seçimi", h3_style))
-        fc_data = [["Tip", "Puan", "K", "ISO Uyumlu", "L(m)"]]
-        for c in conditioners[:3]:
-            fc_data.append([
-                c["name_tr"],
-                f"{c['total_score']:.0f}",
-                str(c["k_factor"]),
-                "✓" if c["iso_compliant"] else "✗",
-                str(c["effective_length_m"]),
-            ])
-        fc_table = Table(fc_data, colWidths=[35*mm, 20*mm, 20*mm, 25*mm, 25*mm])
-        fc_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1565C0")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), white),
-            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(fc_table)
-
-    story.append(PageBreak())
-    story.append(Paragraph("STANDARTLAR & ÖNERİLER", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=HexColor("#1F4E79")))
-
-    standards = [
-        ("ASME B31.3", "Proses borulama dizaynı"),
-        ("ASME B16.5", "Flanş basınç sınıfı seçimi"),
-        ("IEC 60079-10-1", "Ex zone sınıflandırması"),
-        ("IEC 61511", "SIL değerlendirme (fonksiyonel güvenlik)"),
-        ("ISO 5168", "Belirsizlik bütçesi hesabı"),
-        ("ISO 6976", "Gaz ısıl değer hesabı"),
-    ]
-    meter_standards = {"ultrasonic": "AGA 9 / ISO 17089", "orifice": "ISO 5167-2 / AGA 3",
-                        "turbine": "AGA 7 / ISO 9951", "coriolis": "AGA 11 / ISO 10790",
-                        "positive_displacement": "API MPMS Ch.4", "vortex": "ISO 17089-2"}
-    if selected_meter.meter_key in meter_standards:
-        standards.insert(0, (meter_standards[selected_meter.meter_key], "Metre tipi standardı"))
-    if requirements.get("h2s"):
-        standards.insert(3, ("ISO 15156 / NACE MR0175", "Sour servis malzeme seçimi"))
-
-    std_data = [["Standart", "Açıklama"]]
-    std_data.extend(standards)
-    std_table = Table(std_data, colWidths=[55*mm, 85*mm])
-    std_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1F4E79")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#CCCCCC")),
-        ("FONTSIZE", (0, 0), (-1, -1), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [white, HexColor("#F0F4F8")]),
-    ]))
-    story.append(std_table)
-
-    story.append(Spacer(1, 10*mm))
-    story.append(Paragraph("Güçlü Yönler:", h3_style))
-    for s in selected_meter.strengths:
-        story.append(Paragraph(f"• {s}", body_style))
-
-    story.append(Spacer(1, 5*mm))
-    story.append(Paragraph("Dikkat Edilmesi Gerekenler:", h3_style))
-    for w in selected_meter.weaknesses:
-        story.append(Paragraph(f"• {w}", body_style))
-    if not selected_meter.weaknesses:
-        story.append(Paragraph("Belirgin zayıflık tespit edilmedi.", body_style))
-
-    # Glossary / Terimler Sözlüğü
-    story.append(Spacer(1, 8*mm))
-    story.append(Paragraph("Terimler Sözlüğü (Glossary)", h3_style))
-    glossary = {
-        "NPS": "Nominal Pipe Size — Boru anma çapı (inç). NPS 8 ≈ 219 mm",
-        "Sm3/h": "Standart metreküp/saat — 1 atm, 15°C referansta debi",
-        "Beta": "d/D — Delik çapı / boru iç çapı oranı. Orifis geometri parametresi",
-        "Cd": "Discharge Coefficient — Deşarj katsayısı, metrenin ölçme verimi",
-        "Re": "Reynolds Sayısı — Akış rejimi (türbülanslı/laminer)",
-        "barg": "Bar gauge — Atmosfer basıncına göre (1 bar = 14.5 psi)",
-        "API Gravite": "Ham petrol yoğunluk ölçüsü. >10 hafif, <22 ağır petrol",
-        "CAPEX": "Capital Expenditure — Yatırım maliyeti (ekipman + kurulum)",
-        "OPEX": "Operational Expenditure — İşletme maliyeti (bakım, enerji)",
-        "Turndown": "Qmax / Qmin — Metrenin ölçebildiği debi aralığı oranı",
+def generate_pdf_from_results(
+    meter_type: str,
+    sizing_result: dict,
+    uncertainty_result: dict,
+    gas_result: dict,
+    output_path: str | Path = "metering_report.pdf",
+    lang: str = "tr",
+) -> str:
+    """Convenience wrapper that builds the data dict from individual results."""
+    data = {
+        "meter_type": meter_type,
+        "standard_ref": uncertainty_result.get("coverage_factor_comment", "ISO 5168"),
+        "pressure": gas_result.get("P_bar", sizing_result.get("P_oper_bar", 0)),
+        "temperature": gas_result.get("T_C", sizing_result.get("T_oper_C", 0)),
+        "flow_max": sizing_result.get("q_max_Sm3h", 0),
+        "flow_min": sizing_result.get("q_min_Sm3h", 0),
+        "density_op": gas_result.get("rho_oper_kg_m3", sizing_result.get("rho_kg_m3", 0)),
+        "viscosity": gas_result.get("mu_Pa_s", sizing_result.get("mu_Pa_s", 0)),
+        "z_factor": gas_result.get("Z", sizing_result.get("Z", 1)),
+        "sizing_results": sizing_result,
+        "uncertainty_components": uncertainty_result.get("components", []),
+        "combined_uncertainty": uncertainty_result.get("combined_standard_uncertainty_pct", 0),
+        "expanded_k2": uncertainty_result.get("expanded_uncertainty_k2_95pct", 0),
+        "gas_properties": {k: v for k, v in gas_result.items() if isinstance(v, (int, float, str))},
+        "notes": _split_notes(sizing_result.get("notes")),
     }
-    for term, desc in sorted(glossary.items()):
-        story.append(Paragraph(f"<b>{term}:</b> {desc}", small_style))
+    return generate_pdf_report(data, output_path, lang)
 
-    story.append(Spacer(1, 12*mm))
-    story.append(HRFlowable(width="40%", thickness=0.5, color=HexColor("#CCCCCC")))
-    story.append(Paragraph("Metering Station Designer v0.3.0 | Otomatik oluşturulmuştur", small_style))
 
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
+def _split_notes(notes) -> list[str]:
+    """Normalize notes field which may be a string ('; ' joined) or a list."""
+    if not notes:
+        return []
+    if isinstance(notes, (list, tuple)):
+        return [str(n) for n in notes]
+    return [n.strip() for n in str(notes).split("; ") if n.strip()]

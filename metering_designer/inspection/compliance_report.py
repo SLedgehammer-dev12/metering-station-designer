@@ -1,7 +1,6 @@
 """Excel compliance report for geometric inspection results."""
 
 import io
-from typing import Optional
 
 try:
     from openpyxl import Workbook

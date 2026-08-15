@@ -4,6 +4,22 @@ Orifice plate sizing and flow calculation.
 """
 
 import math
+from metering_designer.core.result import Result
+
+TAP_TYPES = {
+    "corner": {"description": "Corner taps (ISO 5167-2 §6.1.2)", "L1": 0.0, "L2": 0.0},
+    "flange": {"description": "Flange taps (ISO 5167-2 §6.1.3)", "L1": None, "L2": None},  # L = 25.4/D_mm
+    "D_D": {"description": "D-D/2 taps (ISO 5167-2 §6.1.4)", "L1": 0.5, "L2": 0.47},
+    "2D": {"description": "2D and 2D taps", "L1": 2.0, "L2": 2.0},
+}
+
+
+def list_tap_types() -> list:
+    """Return list of supported orifice tap types with descriptions."""
+    return [
+        {"name": name, "description": cfg["description"]}
+        for name, cfg in TAP_TYPES.items()
+    ]
 
 
 def calc_beta_ratio(
@@ -12,6 +28,7 @@ def calc_beta_ratio(
     rho_kg_m3: float,
     mu_Pa_s: float,
     dp_target_Pa: float = 25000,
+    tap_type: str = "corner",
 ) -> dict:
     """
     Calculate orifice beta ratio (d/D) for a given mass flow rate.
@@ -24,6 +41,11 @@ def calc_beta_ratio(
         mu_Pa_s: dynamic viscosity [Pa·s]
         dp_target_Pa: target differential pressure [Pa] (default 250 mbar)
     """
+    if tap_type not in TAP_TYPES:
+        raise ValueError(
+            f"Unknown tap_type '{tap_type}'. Available options: {', '.join(TAP_TYPES.keys())}"
+        )
+
     D_m = D_mm / 1000
     A_pipe = math.pi * (D_m / 2) ** 2
     v_m_s = qm_kg_s / (rho_kg_m3 * A_pipe) if rho_kg_m3 > 0 and A_pipe > 0 else 0
@@ -34,7 +56,7 @@ def calc_beta_ratio(
     beta = 0.6
     for i in range(30):
         eps = _expansibility_factor(beta, dp_target_Pa, 4.5e6)
-        Cd = _discharge_coefficient_rhg(beta, Re, D_mm)
+        Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
         d_mm = beta * D_mm
         d_m = d_mm / 1000
         A_throat = math.pi * (d_m / 2) ** 2
@@ -66,7 +88,7 @@ def calc_beta_ratio(
     # Final Cd with converged β
     beta = max(0.1, min(beta, 0.75))
     d_mm = beta * D_mm
-    Cd = _discharge_coefficient_rhg(beta, Re, D_mm)
+    Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
     eps = _expansibility_factor(beta, dp_target_Pa, 4.5e6)
     d_m = d_mm / 1000
     A_throat = math.pi * (d_m / 2) ** 2
@@ -92,18 +114,32 @@ def calc_beta_ratio(
         "dp_permanent_mbar": round(dp_permanent_Pa / 100, 1),
         "beta_valid": beta_ok,
         "Re_valid": re_limits_ok,
+        "tap_type": tap_type,
+        "tap_type_description": TAP_TYPES.get(tap_type, {}).get("description", ""),
         "notes": _generate_notes(beta, beta_ok),
     }
 
 
-def _discharge_coefficient_rhg(beta: float, Re: float, D_mm: float) -> float:
+def _discharge_coefficient_rhg(beta: float, Re: float, D_mm: float, tap_type: str = "corner") -> float:
     """Reader-Harris/Gallagher discharge coefficient (ISO 5167-2:2003)."""
     if Re < 100:
         return 0.6
     D_m = D_mm / 1000
 
-    L1 = 0.0
-    L2 = 0.0
+    # Determine L1 and L2 based on tap type per ISO 5167-2 §6.1
+    tap_type = tap_type or "corner"
+    if tap_type not in TAP_TYPES:
+        tap_type = "corner"
+
+    L1_cfg = TAP_TYPES[tap_type]["L1"]
+    L2_cfg = TAP_TYPES[tap_type]["L2"]
+
+    if L1_cfg is None:  # flange taps: distance = 25.4 mm (1 inch)
+        L1 = 25.4 / D_mm if D_mm > 0 else 0.0
+        L2 = 25.4 / D_mm if D_mm > 0 else 0.0
+    else:
+        L1 = L1_cfg
+        L2 = L2_cfg
 
     term1 = 0.5961 + 0.0261 * beta ** 2 - 0.216 * beta ** 8
     term2 = 0.000521 * (1e6 * beta / Re) ** 0.7
@@ -163,13 +199,14 @@ def size_orifice_for_flow(
     mu_Pa_s: float,
     Z: float,
     rho_std_kg_m3: float,
+    tap_type: str = "corner",
 ) -> dict:
     """Size orifice meter for given gas flow range."""
     qm_max = q_max_Sm3h * rho_std_kg_m3 / 3600
     qm_min = q_min_Sm3h * rho_std_kg_m3 / 3600
     dp_max_Pa = 25000
 
-    result = calc_beta_ratio(qm_max, D_mm, rho_kg_m3, mu_Pa_s, dp_max_Pa)
+    result = calc_beta_ratio(qm_max, D_mm, rho_kg_m3, mu_Pa_s, dp_max_Pa, tap_type=tap_type)
 
     D_m = D_mm / 1000
     A_pipe = math.pi * (D_m / 2) ** 2
@@ -177,8 +214,91 @@ def size_orifice_for_flow(
     turndown_actual = q_max_Sm3h / q_min_Sm3h if q_min_Sm3h > 0 else float("inf")
 
     result["turndown_actual"] = round(turndown_actual, 2)
+    result["turndown_ok"] = turndown_actual >= 10
     result["dp_at_qmin_mbar"] = round(dp_min / 100, 2)
     result["dp_at_qmax_mbar"] = round(dp_max_Pa / 100, 1)
     result["velocity_ms"] = round(qm_max / (rho_kg_m3 * A_pipe), 2) if rho_kg_m3 > 0 and A_pipe > 0 else 0
 
+    return result
+
+
+def calc_beta_ratio_with_fluid(
+    qm_kg_s: float,
+    D_mm: float,
+    fluid: "Fluid",
+    dp_target_Pa: float = 25000,
+    tap_type: str = "corner",
+) -> dict:
+    """Wrapper around calc_beta_ratio that extracts fluid props from Fluid object.
+
+    Args:
+        qm_kg_s: mass flow rate [kg/s]
+        D_mm: pipe internal diameter [mm]
+        fluid: Fluid dataclass instance with rho_oper_kg_m3, mu_dynamic_Pa_s
+        dp_target_Pa: target differential pressure [Pa]
+        tap_type: tap type ("corner", "flange", "D_D", "2D")
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3 if hasattr(fluid, "rho_oper_kg_m3") else 0
+    mu = fluid.mu_dynamic_Pa_s if hasattr(fluid, "mu_dynamic_Pa_s") else 1e-5
+
+    return calc_beta_ratio(qm_kg_s, D_mm, rho, mu, dp_target_Pa, tap_type=tap_type)
+
+
+def size_orifice_for_flow_with_fluid(
+    q_max_Sm3h: float,
+    q_min_Sm3h: float,
+    D_mm: float,
+    fluid: "Fluid",
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+    tap_type: str = "corner",
+) -> dict:
+    """Wrapper around size_orifice_for_flow that accepts Fluid.
+
+    Args:
+        q_max_Sm3h: maximum flow rate [Sm³/h]
+        q_min_Sm3h: minimum flow rate [Sm³/h]
+        D_mm: pipe internal diameter [mm]
+        fluid: Fluid dataclass instance
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+        tap_type: tap type ("corner", "flange", "D_D", "2D")
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    mu = fluid.mu_dynamic_Pa_s
+    rho_std = fluid.rho_std_kg_m3
+    Z = fluid.Z_oper
+
+    return size_orifice_for_flow(
+        q_max_Sm3h, q_min_Sm3h, D_mm, P_oper_bar, T_oper_C,
+        rho, mu, Z, rho_std, tap_type=tap_type,
+    )
+
+
+def calc_beta_ratio_result(
+    qm_kg_s: float,
+    D_mm: float,
+    rho_kg_m3: float,
+    mu_Pa_s: float,
+    dp_target_Pa: float = 25000,
+    tap_type: str = "corner",
+) -> Result:
+    """Calculate orifice beta ratio with provenance tracking."""
+    result = Result()
+    try:
+        data = calc_beta_ratio(qm_kg_s, D_mm, rho_kg_m3, mu_Pa_s, dp_target_Pa, tap_type=tap_type)
+        result.data = data
+        result.add_provenance(
+            function_name="calc_beta_ratio",
+            parameters={"tap_type": tap_type, "dp_target_Pa": dp_target_Pa},
+            standard_ref="ISO 5167-2:2003",
+        )
+        if not data.get("beta_valid", False):
+            result.warnings.append("Beta ratio outside ISO 5167-2 recommended range (0.1-0.75)")
+    except Exception as e:
+        result.errors.append(str(e))
     return result

@@ -197,6 +197,67 @@
           "criticality": "MINOR"
         }
       }
+    },
+    "conditioner_gallagher": {
+      "name_tr": "Gallagher Flow Conditioner",
+      "name_en": "Gallagher Flow Conditioner",
+      "standard": "ISO 5167-2 §7.4.1",
+      "parameters": {
+        "vane_thickness": {
+          "label_tr": "Kanat Kalınlığı",
+          "label_en": "Vane Thickness",
+          "unit": "mm",
+          "points": {"count": 4},
+          "tolerance": {"type": "percentage", "value": 0.3, "base_param": "d"},
+          "clause": "ISO 5167-2 §7.4.1",
+          "criticality": "MAJOR"
+        },
+        "vane_count": {
+          "label_tr": "Kanat Sayısı",
+          "label_en": "Vane Count",
+          "unit": "count",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 8, "max": 12},
+          "clause": "ISO 5167-2 §7.4.1",
+          "criticality": "MAJOR"
+        },
+        "concentricity": {
+          "label_tr": "Eşmerkezlilik (vana deseni kaçıklığı)",
+          "label_en": "Concentricity (vane pattern offset)",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 5167-2 §7.4.1",
+          "criticality": "MINOR"
+        },
+        "surface_finish": {
+          "label_tr": "Yüzey Pürüzlülüğü (Ra)",
+          "label_en": "Surface Finish (Ra)",
+          "unit": "μm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 3.2},
+          "clause": "ISO 5167-2 §7.4.1",
+          "criticality": "MINOR"
+        },
+        "slot_width": {
+          "label_tr": "Yarık Genişliği",
+          "label_en": "Slot Width",
+          "unit": "mm",
+          "points": {"count": 4},
+          "tolerance": {"type": "percentage_or_absolute", "percentage": 2.0, "absolute_mm": 0.1, "base_param": "d", "use": "larger"},
+          "clause": "ISO 5167-2 §7.4.1",
+          "criticality": "MAJOR"
+        },
+        "open_area_ratio": {
+          "label_tr": "Toplam Açık Alan Oranı",
+          "label_en": "Total Open Area Ratio",
+          "unit": "%",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 40, "max": 60},
+          "clause": "ISO 5167-1 Tablo 4",
+          "criticality": "CRITICAL"
+        }
+      }
     }
   }
 }

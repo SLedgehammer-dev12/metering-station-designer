@@ -94,7 +94,39 @@ def size_pd_meter(
     }
 
 
+def size_pd_meter_with_fluid(
+    nps: int,
+    q_max_m3h: float,
+    q_min_m3h: float,
+    fluid: "Fluid",
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+) -> dict:
+    """Wrapper around size_pd_meter that accepts Fluid object.
+
+    Converts mu_dynamic_Pa_s to centipoise (1 cP = 0.001 Pa·s).
+
+    Args:
+        nps: nominal pipe size
+        q_max_m3h: maximum actual volumetric flow rate [m³/h]
+        q_min_m3h: minimum actual volumetric flow rate [m³/h]
+        fluid: Fluid dataclass instance
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    visc_cp = fluid.mu_dynamic_Pa_s / 0.001  # Pa·s → cP
+
+    return size_pd_meter(
+        nps, q_max_m3h, q_min_m3h, rho, visc_cp, P_oper_bar, T_oper_C,
+    )
+
+
 def _estimate_slip_pct(visc_cp: float, dp_bar: float, cap_pct: float) -> float:
+    if visc_cp <= 0:
+        visc_cp = 0.05  # lowest credible slip threshold to avoid div-by-zero
     base_slip = max(0.05, 2.0 / visc_cp)
     dp_factor = (dp_bar / 0.3) ** 0.5
     cap_factor = 1.0 / max(cap_pct / 50.0, 0.5)

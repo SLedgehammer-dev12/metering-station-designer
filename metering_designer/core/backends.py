@@ -8,8 +8,6 @@ Priority:
   Layer 4: Internal DAK/Papay correlation - pure Python, always available
 """
 
-import math
-
 try:
     import pyaga8
     HAS_PYAGA8 = True
@@ -35,8 +33,11 @@ except ImportError:
     HAS_FLUIDS = False
 
 from metering_designer.fluids.aga8 import calc_density as internal_z
+from metering_designer.fluids.data import get_molar_masses, get_cv_data
+from metering_designer.core.result import Result
 
 R = 8.314462618
+DATASET_VERSION = "1.0"
 
 COMPONENT_MAP_PYAGA8 = {
     "C1": "methane", "C2": "ethane", "C3": "propane",
@@ -70,6 +71,12 @@ def _make_pyaga8_comp(composition: dict[str, float]) -> "pyaga8.Composition":
             val = getattr(comp, name, 0)
             if total > 0:
                 setattr(comp, name, val / total)
+    # pyaga8 panics when fractions do not sum to exactly 1.0; force the last
+    # nonzero component to absorb any floating-point residual.
+    names = [n for n in COMPONENT_MAP_PYAGA8.values() if getattr(comp, n, 0) > 0]
+    if names:
+        remaining = 1.0 - sum(getattr(comp, n, 0) for n in names[:-1])
+        setattr(comp, names[-1], max(0.0, remaining))
     return comp
 
 
@@ -84,9 +91,7 @@ def _z_pyaga8_detail(P_kPa: float, T_K: float, composition: dict) -> tuple[float
     d_kmol_m3 = d.d
 
     # M computed from composition (pyaga8 mm needs calc_properties which is slow)
-    MOLAR_MASSES = {"C1": 16.043, "C2": 30.07, "C3": 44.096, "iC4": 58.123, "nC4": 58.123,
-                    "iC5": 72.15, "nC5": 72.15, "C6": 86.177, "C6plus": 90.0,
-                    "N2": 28.013, "CO2": 44.01, "H2S": 34.082}
+    MOLAR_MASSES = get_molar_masses()
     total = sum(v for v in composition.values() if v > 0)
     M = sum(composition.get(k, 0) * MOLAR_MASSES.get(k, 0) for k in MOLAR_MASSES)
     M = M / total if total > 0 else 20.0
@@ -107,11 +112,13 @@ def _z_coolprop(P_Pa: float, T_K: float, composition: dict) -> tuple[float, floa
         Z = CP.PropsSI("Z", "P", P_Pa, "T", T_K, fluids_str)
         Dmass = CP.PropsSI("D", "P", P_Pa, "T", T_K, fluids_str)
         Mmass = CP.PropsSI("M", "P", P_Pa, "T", T_K, fluids_str)
-        return Z, Dmass / Mmass, Mmass * 1000, "CoolProp HEOS (GERG-2008 fallback)"
+        # Normalize units to the shared contract: d_kmol in kmol/m³, M in g/mol
+        return Z, Dmass / Mmass / 1000, Mmass * 1000, "CoolProp HEOS (GERG-2008 fallback)"
     except Exception:
         Z_meth = CP.PropsSI("Z", "P", P_Pa, "T", T_K, "Methane")
         D_meth = CP.PropsSI("D", "P", P_Pa, "T", T_K, "Methane")
-        return Z_meth, D_meth / 0.016043, 0.016043, "CoolProp Methane-only (mixture failed)"
+        M_mmol = 0.016043
+        return Z_meth, D_meth / (M_mmol * 1000), M_mmol * 1000, "CoolProp Methane-only (mixture failed)"
 
 
 def _z_thermo(P_Pa: float, T_K: float, composition: dict) -> tuple[float, float, float, str]:
@@ -172,20 +179,30 @@ def calc_z_factor(P_bar: float, T_C: float, composition: dict[str, float]) -> di
                 errors.append(f"pyaga8 returned invalid Z={Z}")
         except Exception as e:
             errors.append(f"pyaga8: {e}")
+        except BaseException as e:
+            # pyaga8 raises PanicException (BaseException) on unnormalized or
+            # unsupported compositions — must not crash the fallback chain.
+            errors.append(f"pyaga8 panic: {e}")
 
     # Layer 2: CoolProp
     if HAS_COOLPROP:
         try:
             Z, d_kmol, M, backend = _z_coolprop(P_Pa, T_K, composition)
             if Z > 0.1 and Z < 3.0:
-                return {
+                result = {
                     "Z": round(Z, 6),
-                    "density_kg_m3": round(d_kmol * M / 1000 if d_kmol > 0 else 0, 4),
-                    "density_kmol_m3": round(d_kmol / 1000 if d_kmol > 0 else 0, 6),
-                    "M_mix": round(M / 1000 if M > 1 else M, 4),
+                    "density_kg_m3": round(d_kmol * M, 4),
+                    "density_kmol_m3": round(d_kmol, 6),
+                    "M_mix": round(M, 4),
                     "backend": backend,
                     "backend_layer": 2,
                 }
+                if "Methane-only" in backend:
+                    result["warnings"] = [
+                        "CoolProp mixture EOS failed — using pure methane Z-factor. "
+                        "Results may be inaccurate for non-standard gas compositions."
+                    ]
+                return result
             else:
                 errors.append(f"CoolProp returned invalid Z={Z}")
         except Exception as e:
@@ -235,32 +252,22 @@ def calc_z_factor(P_bar: float, T_C: float, composition: dict[str, float]) -> di
 
 
 def calc_heating_value(composition: dict[str, float]) -> dict:
-    """Calculate gross/net heating value and Wobbe index."""
-    cv_data = {
-        "C1": [39.84, 35.88], "C2": [70.29, 64.35], "C3": [101.2, 93.18],
-        "iC4": [133.0, 122.8], "nC4": [133.0, 122.8], "iC5": [163.5, 151.3],
-        "nC5": [163.5, 151.3], "C6": [194.0, 179.8], "C6plus": [210.0, 195.0],
-        "H2S": [25.33, 23.33], "N2": [0, 0], "CO2": [0, 0],
-    }
-    if HAS_THERMO:
-        try:
-            total = sum(v for v in composition.values() if v > 0)
-            x_norm = {k: v / total for k, v in composition.items() if v > 0}
-            from thermo import Mixture
-            mix = Mixture(
-                [CP_FLUID_NAMES.get(k, k) for k in x_norm],
-                zs=[x_norm[k] for k in x_norm],
-            )
-            return {
-                "gross_CV_MJ_m3": round(mix.Hc / 1e6, 4) if hasattr(mix, "Hc") else 0,
-                "net_CV_MJ_m3": round(mix.LHV_mass * mix.MW / 1000, 4) if hasattr(mix, "LHV_mass") else 0,
-                "backend": "thermo library",
-            }
-        except Exception:
-            pass
+    cv_data = get_cv_data()
+    total = sum(v for v in composition.values() if v > 0)
+    if total <= 0:
+        return {
+            "gross_CV_MJ_m3": 0,
+            "net_CV_MJ_m3": 0,
+            "backend": "Internal ISO 6976 data (empty composition)",
+        }
+    # Normalize fraction-type (mole fraction 0..1) vs percent-type (sum=100).
+    # The 'thermo' library branch is intentionally not used: its Hc/LHV
+    # attributes are unit-inconsistent (J/kg, sign-reversed) and unreliable
+    # across versions, so the certified ISO 6976 internal data is always used.
+    x_norm = {k: v / total for k, v in composition.items() if v > 0 and k in cv_data}
 
-    gross = sum(composition.get(c, 0) * v[0] for c, v in cv_data.items())
-    net = sum(composition.get(c, 0) * v[1] for c, v in cv_data.items())
+    gross = sum(x_norm.get(c, 0) * v[0] for c, v in cv_data.items())
+    net = sum(x_norm.get(c, 0) * v[1] for c, v in cv_data.items())
     return {
         "gross_CV_MJ_m3": round(gross, 4),
         "net_CV_MJ_m3": round(net, 4),
@@ -276,3 +283,28 @@ def get_backend_status() -> dict:
         "fluids": HAS_FLUIDS,
         "internal_dak": True,
     }
+
+
+def calc_z_factor_result(P_bar: float, T_C: float, composition: dict[str, float]) -> Result:
+    """Calculate Z-factor with provenance tracking."""
+    import datetime
+    result = Result()
+    try:
+        data = calc_z_factor(P_bar, T_C, composition)
+        result.data = data
+        backend_layer = data.get("backend_layer", 4)
+        backend_name = data.get("backend", "internal")
+        result.add_provenance(
+            function_name="calc_z_factor",
+            parameters={"P_bar": P_bar, "T_C": T_C},
+            standard_ref=f"AGA 8:1994 (backend_layer={backend_layer}, {backend_name})",
+        )
+        if data.get("Z", 1.0) <= 0.1 or data.get("Z", 1.0) >= 3.0:
+            result.warnings.append(f"Z-factor out of expected range: {data.get('Z')}")
+        if "errors" in data:
+            result.errors.extend(data["errors"])
+        if "warnings" in data:
+            result.warnings.extend(data["warnings"])
+    except Exception as e:
+        result.errors.append(str(e))
+    return result

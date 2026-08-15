@@ -72,6 +72,38 @@ def size_v_cone(
     }
 
 
+def size_v_cone_with_fluid(
+    nps: int,
+    q_max_Sm3h: float,
+    q_min_Sm3h: float,
+    fluid: "Fluid",
+    is_gas: bool = True,
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+) -> dict:
+    """Wrapper around size_v_cone that accepts Fluid object.
+
+    Args:
+        nps: nominal pipe size
+        q_max_Sm3h: maximum flow rate [Sm³/h]
+        q_min_Sm3h: minimum flow rate [Sm³/h]
+        fluid: Fluid dataclass instance
+        is_gas: True for gas, False for liquid
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    mu = fluid.mu_dynamic_Pa_s
+    rho_std = fluid.rho_std_kg_m3
+
+    return size_v_cone(
+        nps, q_max_Sm3h, q_min_Sm3h, P_oper_bar, T_oper_C,
+        rho, mu, rho_std, is_gas=is_gas,
+    )
+
+
 def size_venturi(
     nps: int,
     q_max_Sm3h: float,
@@ -118,6 +150,36 @@ def size_venturi(
         "straight_upstream_D": 8, "straight_downstream_D": 5,
         "notes": "Cd=0.995 sabit, β=0.5. ISO 5167-4 machined convergent.",
     }
+
+
+def size_venturi_with_fluid(
+    nps: int,
+    q_max_Sm3h: float,
+    q_min_Sm3h: float,
+    fluid: "Fluid",
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+) -> dict:
+    """Wrapper around size_venturi that accepts Fluid object.
+
+    Args:
+        nps: nominal pipe size
+        q_max_Sm3h: maximum flow rate [Sm³/h]
+        q_min_Sm3h: minimum flow rate [Sm³/h]
+        fluid: Fluid dataclass instance
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    mu = fluid.mu_dynamic_Pa_s
+    rho_std = fluid.rho_std_kg_m3
+
+    return size_venturi(
+        nps, q_max_Sm3h, q_min_Sm3h, P_oper_bar, T_oper_C,
+        rho, mu, rho_std,
+    )
 
 
 def _estimate_vcone_beta(q_m3s: float, id_mm: float, rho: float) -> float:

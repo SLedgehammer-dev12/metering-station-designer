@@ -1,9 +1,17 @@
 """
 Geometric deviation → uncertainty impact calculation.
 Computes additional measurement uncertainty from geometric non-conformances.
+Supports GUM-compliant automatic error propagation via 'uncertainties' library.
 """
 
 import math
+from metering_designer.core.result import Result
+
+try:
+    from uncertainties import ufloat
+    HAS_UNCERTAINTIES = True
+except ImportError:
+    HAS_UNCERTAINTIES = False
 
 
 def compute_geometric_uncertainty(report) -> float:
@@ -41,9 +49,39 @@ def compute_geometric_uncertainty(report) -> float:
 
 def recompute_uncertainty(base_uncertainty_pct: float, geometric_contribution_pct: float) -> dict:
     combined = math.sqrt(base_uncertainty_pct ** 2 + geometric_contribution_pct ** 2)
-    return {
+    result = {
         "base_uncertainty_pct": round(base_uncertainty_pct, 4),
         "geometric_contribution_pct": round(geometric_contribution_pct, 4),
         "combined_uncertainty_pct": round(combined, 4),
         "expanded_k2_pct": round(combined * 2, 4),
     }
+    if HAS_UNCERTAINTIES:
+        u_base = ufloat(base_uncertainty_pct, base_uncertainty_pct * 0.05)
+        u_geo = ufloat(geometric_contribution_pct, geometric_contribution_pct * 0.05)
+        u_combined = (u_base ** 2 + u_geo ** 2) ** 0.5
+        result["gum_combined"] = round(u_combined.nominal_value, 4)
+        result["gum_std_uncertainty"] = round(u_combined.std_dev, 6)
+        result["gum_k2"] = round(u_combined.nominal_value * 2, 4)
+    return result
+
+
+def recompute_uncertainty_result(
+    base_uncertainty_pct: float,
+    geometric_contribution_pct: float,
+) -> Result:
+    """Recompute uncertainty with provenance tracking."""
+    result = Result()
+    try:
+        data = recompute_uncertainty(base_uncertainty_pct, geometric_contribution_pct)
+        result.data = data
+        result.add_provenance(
+            function_name="recompute_uncertainty",
+            parameters={
+                "base_uncertainty_pct": base_uncertainty_pct,
+                "geometric_contribution_pct": geometric_contribution_pct,
+            },
+            standard_ref="ISO 5168:2023 (GUM methodology)",
+        )
+    except Exception as e:
+        result.errors.append(str(e))
+    return result

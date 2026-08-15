@@ -74,6 +74,36 @@ def size_coriolis(
     }
 
 
+def size_coriolis_with_fluid(
+    nps: int,
+    q_max_Sm3h: float,
+    q_min_Sm3h: float,
+    fluid: "Fluid",
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+) -> dict:
+    """Wrapper around size_coriolis that accepts Fluid object.
+
+    Args:
+        nps: nominal pipe size
+        q_max_Sm3h: maximum flow rate [Sm³/h]
+        q_min_Sm3h: minimum flow rate [Sm³/h]
+        fluid: Fluid dataclass instance
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    mu = fluid.mu_dynamic_Pa_s
+    rho_std = fluid.rho_std_kg_m3
+
+    return size_coriolis(
+        nps, q_max_Sm3h, q_min_Sm3h, P_oper_bar, T_oper_C,
+        rho, mu, rho_std,
+    )
+
+
 def _estimate_coriolis_dp(v_ms: float, rho_kg_m3: float, size_in: float) -> float:
     if v_ms <= 0 or rho_kg_m3 <= 0:
         return 0.2

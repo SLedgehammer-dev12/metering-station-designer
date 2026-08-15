@@ -52,8 +52,9 @@ class InspectionParameter:
             return "PENDING"
         if any(s == "FAIL" for s in statuses):
             return "FAIL"
-        if self.criticality == "CRITICAL" and any(s == "FAIL" for s in statuses):
-            return "FAIL"
+        # Partial measurement: some points still unmeasured → do not claim PASS
+        if len(statuses) < len(self.points):
+            return "PENDING"
         return "PASS"
 
 
@@ -134,7 +135,7 @@ class InspectionReport:
         if critical_fails:
             return f"FAIL — {len(critical_fails)} Critical hata"
         if self.failed_params > 0:
-            return f"CONDITIONAL — {self.failed_params} Major/Minor non-conformance"
+            return f"FAIL — {self.failed_params} Major/Minor non-conformance"
         if self.conditional_params > 0:
             return "CONDITIONAL — Kabul edilebilir sapmalar var"
         return "PASS — Tam uyumlu"

@@ -2,47 +2,52 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".."))
 
+from metering_designer.core.i18n import get_text
 from metering_designer.inspection.builder import (
     build_inspection_checklist, evaluate_report,
     METER_LABELS_TR, CONDITIONER_LABELS_TR,
 )
-from metering_designer.inspection.uncertainty_impact import compute_geometric_uncertainty, recompute_uncertainty
+from metering_designer.inspection.uncertainty_impact import compute_geometric_uncertainty
+from metering_designer.metrology.uncertainty import calc_uncertainty_budget_detailed
 from metering_designer.inspection.compliance_report import generate_compliance_report, HAS_OPENPYXL
 
-st.header("📏 Geometrik Denetim")
-st.caption("Mevcut ölçüm istasyonunun geometrik uygunluğunu kontrol edin.")
+lang = st.session_state.lang
+t = lambda k: get_text(k, lang)
+
+st.header(t("inspection_header"))
+st.caption(t("inspection_caption"))
 
 st.session_state.setdefault("inspection_report", None)
 
-tab1, tab2 = st.tabs(["📝 Ölçüm Girişi", "📊 Değerlendirme"])
+tab1, tab2 = st.tabs([t("inspection_tab_input"), t("inspection_tab_results")])
 
 # ═══════════════ TAB 1: INPUT ═══════════════
 with tab1:
-    st.subheader("① Ekipman Seçimi")
+    st.subheader(t("inspection_equipment"))
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        meter_type = st.selectbox("Akışmetre Tipi", list(METER_LABELS_TR.keys()),
+        meter_type = st.selectbox(t("inspection_meter"), list(METER_LABELS_TR.keys()),
                                    format_func=lambda x: METER_LABELS_TR.get(x, x),
                                    key="insp_meter")
     with col2:
         cond_options = ["none"] + list(CONDITIONER_LABELS_TR.keys())
-        cond_type = st.selectbox("Akış Düzenleyici", cond_options,
-                                  format_func=lambda x: CONDITIONER_LABELS_TR.get(x, "Yok") if x != "none" else "Yok",
+        cond_type = st.selectbox(t("inspection_cond"), cond_options,
+                                  format_func=lambda x: CONDITIONER_LABELS_TR.get(x, t("inspection_none")) if x != "none" else t("inspection_none"),
                                   key="insp_cond")
         if cond_type == "none":
             cond_type = None
 
     with col3:
-        nps = st.number_input("NPS", min_value=2, max_value=48, value=8, step=2, key="insp_nps")
+        nps = st.number_input(t("inspection_nps"), min_value=2, max_value=48, value=8, step=2, key="insp_nps")
     with col4:
-        D_mm = st.number_input("D (İç Çap, mm)", min_value=10.0, value=202.7, step=0.1, key="insp_D")
+        D_mm = st.number_input(t("inspection_d"), min_value=10.0, value=202.7, step=0.1, key="insp_D")
 
     beta = None
     if "orifice" in meter_type:
-        beta = st.number_input("β Oranı (d/D)", min_value=0.1, max_value=0.75, value=0.65, step=0.01, key="insp_beta")
+        beta = st.number_input(t("inspection_beta"), min_value=0.1, max_value=0.75, value=0.65, step=0.01, key="insp_beta")
 
-    if st.button("🔍 Ölçüm Listesini Oluştur", use_container_width=True, type="primary"):
+    if st.button(t("inspection_build"), use_container_width=True, type="primary"):
         report = build_inspection_checklist(
             meter_type=meter_type, conditioner_type=cond_type,
             nps=nps, beta=beta, D_mm=D_mm,
@@ -54,7 +59,7 @@ with tab1:
 
     report = st.session_state.get("inspection_report")
     if not report:
-        st.info("👆 Ekipman seçimini yapıp 'Ölçüm Listesini Oluştur' butonuna tıklayın.")
+        st.info(t("inspection_hint"))
         st.stop()
 
     st.divider()
@@ -106,7 +111,7 @@ with tab1:
                     pt.nominal = (pt.nominal or val)
                     tol = pt.tol_upper or pt.tol_lower
                     if tol:
-                        st.caption(f"Tolerans: {'±' + str(tol) if pt.tol_upper == abs(pt.tol_lower or 0) else f'{pt.tol_lower} — {pt.tol_upper}'} {param.unit}")
+                        st.caption(f"{t('inspection_tolerance')} {'±' + str(tol) if pt.tol_upper == abs(pt.tol_lower or 0) else f'{pt.tol_lower} — {pt.tol_upper}'} {param.unit}")
                 elif n_pts <= 6:
                     cols = st.columns(min(n_pts, 4))
                     for i, pt in enumerate(param.points):
@@ -143,12 +148,12 @@ with tab1:
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        if st.button("🔄 Tüm Ölçümleri Temizle", use_container_width=True):
+        if st.button(t("inspection_clear"), use_container_width=True):
             if "inspection_report" in st.session_state:
                 del st.session_state.inspection_report
             st.rerun()
     with col_b2:
-        if st.button("📊 Değerlendir → Tab 2'ye Git", use_container_width=True, type="primary"):
+        if st.button(t("inspection_evaluate"), use_container_width=True, type="primary"):
             evaluate_report(report)
             st.rerun()
 
@@ -157,14 +162,46 @@ with tab1:
 with tab2:
     report = st.session_state.get("inspection_report")
     if not report:
-        st.info("👆 Önce Tab 1'de ekipman seçip ölçümleri girin.")
+        st.info(t("inspection_go_tab1"))
         st.stop()
 
     evaluate_report(report)
     geo_unc = compute_geometric_uncertainty(report)
 
+    # Tolerance schematic (informational drawing with tolerance callouts)
+    st.subheader(t("inspection_import_tolerance"))
+    st.caption(t("inspection_tol_caption"))
+    try:
+        # Build a lightweight tolerance summary from the inspection parameters
+        tol_list = []
+        seen = set()
+        for comp in report.components:
+            for p in comp.parameters:
+                for pt in p.points:
+                    tol = pt.tol_upper or pt.tol_lower
+                    if tol is not None:
+                        key = f"{p.label[:24]}" if len(p.label) > 24 else p.label
+                        if key not in seen:
+                            seen.add(key)
+                            tol_list.append((key, f"{pt.tol_lower}…{pt.tol_upper} {p.unit}"))
+        tol_summary = dict(tol_list)
+        from metering_designer.instruments.schematic import render_schematic
+        fig = render_schematic(
+            meter_key=report.meter_type,
+            nps=report.nps,
+            conditioner_key=report.conditioner_type,
+            tolerances=tol_summary or None,
+            lang=lang,
+        )
+        st.pyplot(fig)
+    except Exception as e:
+        st.warning(t("inspection_tol_not_avail"))
+        st.caption(str(e))
+
+    st.divider()
+
     # Overall status
-    st.subheader("📊 Genel Durum")
+    st.subheader(t("inspection_overall"))
     status = report.overall_status
     if "FAIL" in status:
         st.error(f"🔴 {status}")
@@ -175,28 +212,28 @@ with tab2:
 
     # Progress bar
     rate = report.pass_rate
-    st.progress(rate / 100, text=f"Geçiş Oranı: %{rate:.1f} ({report.passed_params}/{report.total_params})")
+    st.progress(rate / 100, text=f"{t('inspection_pass_rate')} %{rate:.1f} ({report.passed_params}/{report.total_params})")
 
     st.divider()
 
     # Component breakdown table
-    st.subheader("📋 Bileşen Bazında Kırılım")
+    st.subheader(t("inspection_breakdown"))
     comp_data = []
     for comp in report.components:
         comp_data.append({
-            "Bileşen": comp.component_name,
-            "PASS": comp.passed_count,
-            "FAIL": comp.failed_count,
-            "Pending": sum(1 for s in comp.all_statuses if s == "PENDING"),
-            "Kritik Hata": len(comp.critical_failures),
-            "Durum": comp.component_status,
+            t("inspection_col_comp"): comp.component_name,
+            t("inspection_col_pass"): comp.passed_count,
+            t("inspection_col_fail"): comp.failed_count,
+            t("inspection_col_pending"): sum(1 for s in comp.all_statuses if s == "PENDING"),
+            t("inspection_col_crit"): len(comp.critical_failures),
+            t("inspection_col_status"): comp.component_status,
         })
     st.dataframe(comp_data, hide_index=True, use_container_width=True)
 
     # Critical failures
     crit = report.get_critical_failures()
     if crit:
-        st.subheader("❌ CRITICAL Hatalar")
+        st.subheader(t("inspection_critical"))
         for p in crit:
             comp = next((c for c in report.components if p in c.parameters), None)
             st.error(f"**{p.label}** — {p.standard_clause} ({comp.component_name if comp else ''})")
@@ -204,7 +241,7 @@ with tab2:
     # All failures
     failed = [p for p in report.all_inspections if p.overall_status == "FAIL" and p.criticality != "CRITICAL"]
     if failed:
-        st.subheader("⚠️ MAJOR/MINOR Non-Conformance")
+        st.subheader(t("inspection_major_minor"))
         for p in failed:
             comp = next((c for c in report.components if p in c.parameters), None)
             st.warning(f"**{p.label}** — {p.standard_clause} ({comp.component_name if comp else ''})")
@@ -212,30 +249,32 @@ with tab2:
     # Conditional
     cond = [p for p in report.all_inspections if p.overall_status == "CONDITIONAL"]
     if cond:
-        st.subheader("ℹ️ Kabul Edilebilir Sapmalar")
+        st.subheader(t("inspection_conditional"))
         for p in cond:
             comp = next((c for c in report.components if p in c.parameters), None)
             st.info(f"**{p.label}** — {p.standard_clause} ({comp.component_name if comp else ''})")
 
     # Uncertainty impact
     st.divider()
-    st.subheader("📊 Belirsizlik Etkisi")
-    base_unc = 0.5
-    unc_result = recompute_uncertainty(base_unc, geo_unc)
+    st.subheader(t("inspection_unc_impact"))
+    base_unc = calc_uncertainty_budget_detailed(meter_type)["combined_standard_uncertainty_pct"]
+    final_budget = calc_uncertainty_budget_detailed(meter_type, geometric_contribution_pct=geo_unc)
+    combined_unc = final_budget["combined_standard_uncertainty_pct"]
+    expanded_k2 = final_budget["expanded_uncertainty_k2_95pct"]
 
     col_u1, col_u2, col_u3 = st.columns(3)
     with col_u1:
-        st.metric("Baz Belirsizlik", f"±{unc_result['base_uncertainty_pct']}%")
+        st.metric(t("inspection_unc_metric"), f"±{base_unc:.4f}%")
     with col_u2:
-        st.metric("Geometrik Katkı", f"+{unc_result['geometric_contribution_pct']:.4f}%")
+        st.metric(t("inspection_geo_contribution"), f"+{geo_unc:.4f}%")
     with col_u3:
-        delta = unc_result['expanded_k2_pct'] - base_unc * 2
+        delta = expanded_k2 - base_unc * 2
         delta_str = f"+{delta:.4f}%" if delta > 0 else "0"
-        st.metric("Toplam (k=2)", f"±{unc_result['expanded_k2_pct']:.4f}%", delta_str)
+        st.metric(t("inspection_total_k2"), f"±{expanded_k2:.4f}%", delta_str)
 
     # Standards clause violations
     st.divider()
-    st.subheader("📜 Standart Madde İhlalleri")
+    st.subheader(t("inspection_std_violations"))
     for comp in report.components:
         for param in comp.parameters:
             icon = {"PASS": "✅", "FAIL": "❌", "CONDITIONAL": "⚠️", "PENDING": "⬜"}.get(param.overall_status, "⬜")
@@ -243,26 +282,26 @@ with tab2:
 
     # Download
     st.divider()
-    st.subheader("📥 Rapor İndir")
+    st.subheader(t("inspection_download"))
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         if HAS_OPENPYXL:
             try:
                 buf = generate_compliance_report(report)
-                st.download_button("📥 Excel Uygunluk Raporu (.xlsx)", data=buf,
+                st.download_button(t("inspection_excel"), data=buf,
                                    file_name="geometrik_denetim_raporu.xlsx",
                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                    use_container_width=True)
             except Exception as e:
                 st.warning(f"Excel raporu oluşturulamadı: {e}")
     with col_d2:
-        txt = f"GEOMETRIK DENETIM RAPORU\n{'='*60}\n"
+        txt = f"{t('inspection_report_title')}\n{'='*60}\n"
         txt += f"Metre: {report.meter_type} | NPS: {report.nps} | D: {report.D_mm}mm\n"
-        txt += f"Kondisyoner: {report.conditioner_type or 'Yok'}\n"
+        txt += f"Kondisyoner: {report.conditioner_type or t('inspection_none')}\n"
         txt += f"Genel Durum: {report.overall_status}\n"
         txt += f"Geçiş Oranı: %{report.pass_rate:.1f} ({report.passed_params}/{report.total_params})\n"
         txt += f"Geometrik Belirsizlik Katkısı: {geo_unc:.4f}%\n"
-        st.download_button("📥 TXT Özet İndir", data=txt, file_name="denetim_ozet.txt", use_container_width=True)
+        st.download_button(t("inspection_txt"), data=txt, file_name="denetim_ozet.txt", use_container_width=True)
 
-    if st.button("🔄 Düzelt ve Tekrar Kontrol Et → Tab 1", use_container_width=True):
+    if st.button(t("inspection_fix"), use_container_width=True):
         pass  # stays on same page, user clicks Tab 1 manually

@@ -1,0 +1,108 @@
+{
+  "metadata": {
+    "standard_refs": [
+      "ISO 5167-2:2022 (orifice pressure taps, temperature location)",
+      "ISO 5167-4 (venturi pressure taps)",
+      "ISO 5167-5 (V-cone pressure taps)",
+      "AGA Report 9 (ultrasonic PT/TT spacing)",
+      "AGA Report 7 (turbine meter)",
+      "AGA Report 11 / API MPMS 5.6 (Coriolis)",
+      "ISO/TR 12764 (vortex)"
+    ],
+    "notes": "positions in pipe diameters (D), upstream=-D, downstream=+D, 0 = at meter flange/center"
+  },
+  "layouts": {
+    "orifice": {
+      "instruments": [
+        {"type": "differential_pressure", "count": 1, "position_D": 1.0, "side": "dP",
+         "standard": "ISO 5167-2 §5.1.5 (flange/DD taps)", "auto_tag": "FT",
+         "note_tr": "Diferansiyel basınç transmiteri (flanş tap veya D-D/2 tap)", "note_en": "Differential pressure transmitter (flange taps or D-D/2 taps)"},
+        {"type": "pressure", "count": 1, "position_D": 1.0, "side": "upstream",
+         "standard": "ISO 5167-2 §5.1.5", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri — upstream alım noktası", "note_en": "Static pressure transmitter — upstream tap"},
+        {"type": "temperature", "count": 1, "position_D": 5.0, "side": "downstream",
+         "standard": "ISO 5167-2 §6.4 (temp >5D downstream)", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri — metre sonrası ≥5D", "note_en": "Temperature transmitter — downstream ≥5D"}
+      ],
+      "notes": "ISO 5167-2 requires PT and dP taps upstream; TT ≥5D downstream of plate for orifice ≥100mm."
+    },
+    "venturi": {
+      "instruments": [
+        {"type": "differential_pressure", "count": 1, "position_D": 1.0, "side": "dP",
+         "standard": "ISO 5167-4 (throat taps)", "auto_tag": "FT",
+         "note_tr": "Diferansiyel basınç transmiteri — boğaz tap", "note_en": "Differential pressure transmitter — throat taps"},
+        {"type": "pressure", "count": 1, "position_D": -2.0, "side": "upstream",
+         "standard": "ISO 5167-4", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri", "note_en": "Static pressure transmitter"},
+        {"type": "temperature", "count": 1, "position_D": 10.0, "side": "downstream",
+         "standard": "ISO 5167-4", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri", "note_en": "Temperature transmitter"}
+      ]
+    },
+    "v_cone": {
+      "instruments": [
+        {"type": "differential_pressure", "count": 1, "position_D": 0.0, "side": "dP",
+         "standard": "ISO 5167-5 (cone pressure taps)", "auto_tag": "FT",
+         "note_tr": "Diferansiyel basınç transmiteri — koni önü/arka tap", "note_en": "Differential pressure transmitter — cone upstream/ports"},
+        {"type": "pressure", "count": 1, "position_D": -1.0, "side": "upstream",
+         "standard": "ISO 5167-5", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri", "note_en": "Static pressure transmitter"},
+        {"type": "temperature", "count": 1, "position_D": 5.0, "side": "downstream",
+         "standard": "ISO 5167-5", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri", "note_en": "Temperature transmitter"}
+      ]
+    },
+    "ultrasonic": {
+      "instruments": [
+        {"type": "pressure", "count": 1, "position_D": -3.0, "side": "upstream",
+         "standard": "AGA Report 9 §5 (PT close to body)", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri — metre gövdesi yakını upstream", "note_en": "Static pressure transmitter — close to USM body upstream"},
+        {"type": "temperature", "count": 1, "position_D": 5.0, "side": "downstream",
+         "standard": "AGA Report 9 §5", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri — metre sonrası", "note_en": "Temperature transmitter — downstream of body"}
+      ],
+      "notes": "USM has adjacent pressure/temperature per AGA 9; no dP element (inherent)."
+    },
+    "turbine": {
+      "instruments": [
+        {"type": "pressure", "count": 1, "position_D": -5.0, "side": "upstream",
+         "standard": "AGA Report 7 §4", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri", "note_en": "Static pressure transmitter"},
+        {"type": "temperature", "count": 1, "position_D": 5.0, "side": "downstream",
+         "standard": "AGA Report 7 §4", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri", "note_en": "Temperature transmitter"}
+      ]
+    },
+    "coriolis": {
+      "instruments": [
+        {"type": "pressure", "count": 1, "position_D": -1.0, "side": "upstream",
+         "standard": "AGA Report 11 §2", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri (opsiyonel, kompakt)", "note_en": "Static pressure transmitter (optional, compact)"},
+        {"type": "temperature", "count": 1, "position_D": 1.0, "side": "downstream",
+         "standard": "AGA Report 11 §2", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri (opsiyonel, kompakt)", "note_en": "Temperature transmitter (optional, compact)"}
+      ],
+      "notes": "Coriolis is a direct mass meter; pressure/temperature typically optional for backing calculations."
+    },
+    "vortex": {
+      "instruments": [
+        {"type": "pressure", "count": 1, "position_D": -3.0, "side": "upstream",
+         "standard": "ISO/TR 12764", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri", "note_en": "Static pressure transmitter"},
+        {"type": "temperature", "count": 1, "position_D": 3.0, "side": "downstream",
+         "standard": "ISO/TR 12764", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri", "note_en": "Temperature transmitter"}
+      ]
+    },
+    "positive_displacement": {
+      "instruments": [
+        {"type": "pressure", "count": 1, "position_D": -1.0, "side": "upstream",
+         "standard": "API MPMS Ch.5 / OIML R137", "auto_tag": "PT",
+         "note_tr": "Statik basınç transmiteri", "note_en": "Static pressure transmitter"},
+        {"type": "temperature", "count": 1, "position_D": 1.0, "side": "downstream",
+         "standard": "API MPMS Ch.5 / OIML R137", "auto_tag": "TT",
+         "note_tr": "Sıcaklık transmiteri", "note_en": "Temperature transmitter"}
+      ]
+    }
+  }
+}

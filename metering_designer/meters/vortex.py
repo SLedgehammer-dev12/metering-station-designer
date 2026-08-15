@@ -88,6 +88,38 @@ def size_vortex(
     }
 
 
+def size_vortex_with_fluid(
+    nps: int,
+    q_max_Sm3h: float,
+    q_min_Sm3h: float,
+    fluid: "Fluid",
+    is_gas: bool = True,
+    P_oper_bar: float = 40.0,
+    T_oper_C: float = 20.0,
+) -> dict:
+    """Wrapper around size_vortex that accepts Fluid object.
+
+    Args:
+        nps: nominal pipe size
+        q_max_Sm3h: maximum flow rate [Sm³/h] (or actual m³/h if liquid)
+        q_min_Sm3h: minimum flow rate [Sm³/h] (or actual m³/h if liquid)
+        fluid: Fluid dataclass instance
+        is_gas: True for gas, False for liquid
+        P_oper_bar: operating pressure [bar]
+        T_oper_C: operating temperature [°C]
+    """
+    from metering_designer.fluids.fluid import Fluid
+
+    rho = fluid.rho_oper_kg_m3
+    mu = fluid.mu_dynamic_Pa_s
+    rho_std = fluid.rho_std_kg_m3
+
+    return size_vortex(
+        nps, q_max_Sm3h, q_min_Sm3h, P_oper_bar, T_oper_C,
+        rho, mu, rho_std, is_gas=is_gas,
+    )
+
+
 def _calc_v_min_limit(rho: float, mu: float, D_m: float) -> float:
     if rho <= 0 or D_m <= 0:
         return 0.3

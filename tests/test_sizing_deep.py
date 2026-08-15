@@ -7,7 +7,7 @@ from metering_designer.meters.turbine import size_turbine
 from metering_designer.meters.coriolis import size_coriolis
 from metering_designer.meters.pd_meter import size_pd_meter
 from metering_designer.meters.vortex import size_vortex
-from metering_designer.meters.vcone import size_v_cone
+from metering_designer.meters.vcone import size_v_cone, size_venturi
 from metering_designer.auxiliaries.erosional_velocity import check_erosional_velocity
 
 
@@ -23,7 +23,8 @@ def test_orifice_cd_positive():
 
 def test_usm_velocity_in_range():
     u = size_ultrasonic(10, 80000, 10000, 55, 45, 45, 1.5e-6, 0.75)
-    assert 0.3 <= u["v_max_ms"] <= 35
+    assert 0.3 <= u["v_max_ms"] <= 30
+    assert isinstance(u["velocity_ok"], bool)
 
 
 def test_usm_path_config():
@@ -33,19 +34,19 @@ def test_usm_path_config():
     assert u10["recommended_paths"] >= 4
 
 
-def test_turbine_k_factor():
+def test_turbine_k_factor_and_bearing():
     t = size_turbine(8, 30000, 5000, 40, 35, 30, 1.5e-6, 0.75)
     assert t["K_factor_pulses_per_m3"] > 0
-
-
-def test_turbine_bearing_life_positive():
-    t = size_turbine(8, 30000, 5000, 40, 35, 30, 1.5e-6, 0.75)
-    assert t["estimated_bearing_life_h"] > 1000
+    assert t["estimated_bearing_life_h"] > 10000
 
 
 def test_coriolis_size_within_range():
     c = size_coriolis(6, 30000, 10000, 40, 35, 35, 1.5e-6, 0.75)
     assert 0.5 <= c["meter_size_inches"] <= 12
+    # Tight check: zero drift effect at Qmin must be under 5%
+    c2 = size_coriolis(4, 5000, 500, 30, 30, 20, 1.5e-6, 0.75)
+    assert "zero_effect_at_qmin_pct" in c2
+    assert c2["zero_effect_at_qmin_pct"] < 5.0
 
 
 def test_pd_meter_slip_realistic():
@@ -69,4 +70,141 @@ def test_erosional_velocity_check():
     assert isinstance(e["ok"], bool)
     # Very fast flow in light gas should trigger warning
     e2 = check_erosional_velocity(100, 5)
-    assert e2["ok"] == False or "warning" in e2
+    assert e2["ok"] is False or "warning" in e2
+
+
+def test_venturi_basic_sizing():
+    """Classical Venturi basic sizing with typical gas parameters."""
+    v = size_venturi(
+        nps=8, q_max_Sm3h=50000, q_min_Sm3h=5000,
+        P_oper_bar=35, T_oper_C=40,
+        rho_kg_m3=25, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert isinstance(v, dict)
+    assert v["Cd"] >= 0.98
+    assert v["beta"] > 0
+    assert v["dp_mbar"] > 0
+    assert v["meter_type"] == "Venturi (klasik)"
+    assert v["Re_ok"] is True or isinstance(v["Re_ok"], bool)
+    assert v["turndown_ok"] is True or isinstance(v["turndown_ok"], bool)
+
+
+def test_venturi_cd_near_0995():
+    """Classical Venturi Cd must be ≈ 0.995 per ISO 5167-4."""
+    v = size_venturi(
+        nps=8, q_max_Sm3h=50000, q_min_Sm3h=5000,
+        P_oper_bar=35, T_oper_C=40,
+        rho_kg_m3=25, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert 0.98 <= v["Cd"] <= 1.0
+    # Cd should be very close to 0.995
+    assert abs(v["Cd"] - 0.995) < 0.02
+
+
+def test_venturi_edge_cases():
+    """Classical Venturi handles small (NPS 4) and large (NPS 16) pipes."""
+    # Small pipe
+    v_small = size_venturi(
+        nps=4, q_max_Sm3h=5000, q_min_Sm3h=500,
+        P_oper_bar=20, T_oper_C=30,
+        rho_kg_m3=15, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert isinstance(v_small, dict)
+    assert v_small["beta"] > 0
+    assert v_small["d_throat_mm"] > 0
+    assert v_small["dp_mbar"] > 0
+
+    # Large pipe
+    v_large = size_venturi(
+        nps=16, q_max_Sm3h=200000, q_min_Sm3h=20000,
+        P_oper_bar=50, T_oper_C=50,
+        rho_kg_m3=35, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert isinstance(v_large, dict)
+    assert v_large["beta"] > 0
+    assert v_large["d_throat_mm"] > 0
+    assert v_large["dp_mbar"] > 0
+    assert v_large["nps"] == 16
+
+
+def test_vortex_liquid_mode():
+    """Vortex meter in liquid mode: lower velocity limit, tighter turndown."""
+    vx = size_vortex(
+        nps=6, q_max_Sm3h=200, q_min_Sm3h=20,
+        P_oper_bar=10, T_oper_C=25,
+        rho_kg_m3=850, mu_Pa_s=0.001, rho_std_kg_m3=850,
+        is_gas=False,
+    )
+    assert vx["v_max_ms"] <= 9
+    assert isinstance(vx["turndown_ok"], bool)
+    assert isinstance(vx["frequency_ok"], bool)
+    assert vx["turndown_max"] == 10
+
+
+def test_orifice_re_warning():
+    """Orifice sizing with very low flow checks Re_valid key exists as bool."""
+    o = size_orifice_for_flow(
+        q_max_Sm3h=100, q_min_Sm3h=10,
+        D_mm=50,
+        P_oper_bar=20, T_oper_C=25,
+        rho_kg_m3=15, mu_Pa_s=1.5e-6,
+        Z=0.9, rho_std_kg_m3=0.75,
+    )
+    assert "Re_valid" in o
+    assert isinstance(o["Re_valid"], bool)
+
+
+def test_vcone_liquid_mode():
+    """V-Cone meter in liquid mode: expansibility = 1, beta in 0.45-0.85."""
+    vc = size_v_cone(
+        nps=8, q_max_Sm3h=500, q_min_Sm3h=50,
+        P_oper_bar=10, T_oper_C=25,
+        rho_kg_m3=850, mu_Pa_s=0.001,
+        rho_std_kg_m3=850,
+        is_gas=False,
+    )
+    assert vc["eps"] == 1.0
+    assert 0.45 <= vc["beta"] <= 0.85
+    assert vc["dp_mbar"] > 0
+    assert vc["meter_type"] == "V-Cone"
+
+
+def test_coriolis_edge_cases():
+    """Coriolis handles edge cases: small NPS + high flow, large NPS + low flow, extreme viscosity."""
+    # Small NPS (2) with very high flow
+    c_small = size_coriolis(
+        nps=2, q_max_Sm3h=30000, q_min_Sm3h=1000,
+        P_oper_bar=40, T_oper_C=35,
+        rho_kg_m3=35, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert 0.5 <= c_small["meter_size_inches"] <= 12
+
+    # Large NPS (12) with low flow
+    c_large = size_coriolis(
+        nps=12, q_max_Sm3h=200, q_min_Sm3h=20,
+        P_oper_bar=20, T_oper_C=30,
+        rho_kg_m3=25, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert 0.5 <= c_large["meter_size_inches"] <= 12
+
+    # Extreme viscosity (100 cP = 0.1 Pa·s)
+    c_visc = size_coriolis(
+        nps=6, q_max_Sm3h=10000, q_min_Sm3h=1000,
+        P_oper_bar=30, T_oper_C=30,
+        rho_kg_m3=30, mu_Pa_s=0.1, rho_std_kg_m3=0.75,
+    )
+    assert 0.5 <= c_visc["meter_size_inches"] <= 12
+    assert isinstance(c_visc["viscosity_effect"], str)
+
+
+def test_erosional_intermittent():
+    """Erosional velocity: intermittent service C=125 gives higher threshold than continuous C=100."""
+    e_int = check_erosional_velocity(10, 50, service_type="intermittent")
+    assert e_int["v_erosional_m_s"] > 0
+    assert isinstance(e_int["ok"], bool)
+    assert e_int["C_factor"] == 125
+
+    # Compare with continuous: intermittent should have higher threshold
+    e_cont = check_erosional_velocity(10, 50, service_type="continuous")
+    assert e_cont["C_factor"] == 100
+    assert e_int["v_erosional_m_s"] > e_cont["v_erosional_m_s"]

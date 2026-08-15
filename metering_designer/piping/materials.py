@@ -204,10 +204,9 @@ def select_material(
             continue
         if min_temp_C < mat["min_temp_C"]:
             continue
-        if offshore and "offshore" in str(mat.get("applies_to", [])):
-            mat["score"] = mat.get("score", 0) + 3
-
         score = 5
+        if offshore and "offshore" in str(mat.get("applies_to", [])):
+            score += 3
         if h2s:
             if mat["h2s_limit_ppm"] >= 100000:
                 score += 3

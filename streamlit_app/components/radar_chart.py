@@ -1,14 +1,21 @@
 import streamlit as st
 import plotly.graph_objects as go
 from metering_designer.core.weights import CATEGORY_LABELS_TR
+from metering_designer.core.i18n import get_text
+
+lang = st.session_state.lang
+t = lambda k: get_text(k, lang)
 
 
 def render_radar_chart(scored_meters: list):
     if not scored_meters:
-        st.info("Yeterli veri yok.")
+        st.info(t("no_data"))
         return
 
-    categories = list(CATEGORY_LABELS_TR.values())
+    def cat_label(ck):
+        return t(f"weights_cat_{ck}") if ck in CATEGORY_LABELS_TR else ck
+
+    categories = [cat_label(ck) for ck in CATEGORY_LABELS_TR]
     cat_keys = list(CATEGORY_LABELS_TR.keys())
 
     fig = go.Figure()
@@ -24,7 +31,7 @@ def render_radar_chart(scored_meters: list):
         fig.add_trace(go.Scatterpolar(
             r=scores,
             theta=categories + [categories[0]],
-            name=f"{meter.name_tr} ({meter.total_score:.1f})",
+            name=f"{meter.name_tr if lang != 'en' else meter.name_en} ({meter.total_score:.1f})",
             line_color=colors[i % len(colors)],
             fill="toself" if i == len(scored_meters) - 1 else None,
             opacity=0.7,

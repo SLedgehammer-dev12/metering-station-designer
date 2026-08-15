@@ -1,19 +1,15 @@
 """
 Pipe schedule recommendation based on ASME B36.10M / B36.19M.
+
+Uses the centralized pipe dimension cache and lookups from
+``metering_designer.piping`` (avoiding duplicate JSON loading).
 """
 
-import json
-import os
-
-KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "knowledge")
+from metering_designer.piping import _load_b3610m
 
 
 def recommend_schedule(nps: int, t_required_mm: float) -> dict:
-    path = os.path.join(KNOWLEDGE_DIR, "asme_b313_stress.json")
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    sched_data = data.get("schedule_data", {}).get("schedules", {})
+    sched_data = _load_b3610m()
     nps_key = f"{nps}_inch"
     if nps_key not in sched_data:
         return {"error": f"NPS {nps}\" schedule verisi bulunamadı"}
@@ -23,7 +19,7 @@ def recommend_schedule(nps: int, t_required_mm: float) -> dict:
 
     available_scheds = []
     for key, wall in info.items():
-        if key.startswith("sch_") or key.startswith("sch_"):
+        if key.endswith("_wall") and key != "od_mm":
             sch_name = key.replace("_", " ").upper()
             available_scheds.append((sch_name, float(wall)))
 

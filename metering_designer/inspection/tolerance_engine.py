@@ -50,8 +50,8 @@ def compute_tolerance(spec: dict, reference_values: dict) -> dict:
     elif t_type == "range":
         lo = spec.get("min", 0)
         hi = spec.get("max", 100)
-        lo = float(lo) if not isinstance(lo, str) else 0.0
-        hi = float(hi) if not isinstance(hi, str) else 100.0
+        lo = _resolve_expr(lo, reference_values, 0.0)
+        hi = _resolve_expr(hi, reference_values, 100.0)
         return {"lower": lo, "upper": hi, "nominal": round((lo + hi) / 2, 2)}
 
     elif t_type == "min_length_D":
@@ -71,3 +71,31 @@ def _evaluate(value: float, op: str, threshold: float) -> bool:
            "<": lambda a, b: a < b, "<=": lambda a, b: a <= b,
            "==": lambda a, b: a == b}
     return ops.get(op, lambda a, b: False)(value, threshold)
+
+
+def _resolve_expr(val, reference_values: dict, fallback: float) -> float:
+    """Resolve numeric or symbolic bound expressions like '1.5×d_tube'."""
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip()
+    for param, ref in reference_values.items():
+        if param in s and "×" in s:
+            coeff_part, _, ref_part = s.partition("×")
+            try:
+                coeff = float(coeff_part.strip())
+                if ref_part.strip() == param:
+                    return round(coeff * ref, 3)
+            except ValueError:
+                break
+    if "×" in s:
+        for param, ref in reference_values.items():
+            if param in s:
+                try:
+                    coeff = float(s.split("×")[0].strip())
+                    return round(coeff * ref, 3)
+                except ValueError:
+                    break
+    try:
+        return float(s)
+    except ValueError:
+        return fallback

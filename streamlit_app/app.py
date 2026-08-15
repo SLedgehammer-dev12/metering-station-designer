@@ -1,3 +1,5 @@
+import os
+
 import streamlit as st
 
 st.set_page_config(
@@ -30,22 +32,31 @@ st.sidebar.markdown("---")
 from metering_designer.core.i18n import get_text
 
 PAGE_KEYS = ["project", "process", "requirements", "weights", "results", "engineering", "report", "inspection"]
+_PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pages")
 PAGE_FILES = {
-    "project": "pages/01_project.py",
-    "process": "pages/02_process.py",
-    "requirements": "pages/03_requirements.py",
-    "weights": "pages/04_weights.py",
-    "results": "pages/05_results.py",
-    "engineering": "pages/06_engineering.py",
-    "report": "pages/07_report.py",
-    "inspection": "pages/08_inspection.py",
+    "project": "01_project.py",
+    "process": "02_process.py",
+    "requirements": "03_requirements.py",
+    "weights": "04_weights.py",
+    "results": "05_results.py",
+    "engineering": "06_engineering.py",
+    "report": "07_report.py",
+    "inspection": "08_inspection.py",
 }
 
 st.session_state.setdefault("lang", "tr")
 st.session_state.setdefault("page", "project")
+st.session_state.setdefault("project", {})
+st.session_state.setdefault("process", {})
+st.session_state.setdefault("requirements", {})
 lang = st.session_state.lang
 
 # Build localized page labels
+for _k in PAGE_KEYS:
+    st.session_state.setdefault(_k, None)
+st.session_state.setdefault("selected_meter", None)
+st.session_state.setdefault("engineering", None)
+st.session_state.setdefault("results", None)
 page_labels = {k: get_text(k, lang) for k in PAGE_KEYS}
 page_label_list = list(page_labels.values())
 current_idx = PAGE_KEYS.index(st.session_state.page)
@@ -104,6 +115,6 @@ if st.sidebar.button("🔄 Sıfırla"):
                 st.session_state[k] = {}
     st.rerun()
 
-page_file = PAGE_FILES.get(st.session_state.page)
-if page_file:
+page_file = os.path.join(_PAGE_DIR, PAGE_FILES.get(st.session_state.page, ""))
+if page_file and os.path.exists(page_file):
     exec(open(page_file).read())

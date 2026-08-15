@@ -2,6 +2,38 @@
 
 All notable changes to Metering Station Designer.
 
+## Unreleased
+
+### Flow Conditioner Selection & Layout
+- **User-selectable flow conditioner** on the Engineering page (`06_engineering.py`): pick none/Zanker/CPA 50E/Gallagher/19-Tube Bundle/Perforated Plate, and straight-pipe requirements recalculate live (upstream/downstream diameters + meters).
+- `calc_straight_pipe()` accepts `with_conditioner` and returns `with_conditioner`/`conditioner_notes` fields; Gallagher reduction per AGA 9, Zanker/CPA per ISO 5167-1 Table 4.
+- **Instrument placement database** (`knowledge/instrument_placements.json`) for 8 meter types (PT/TT/dP position in diameters, auto-tags, standard refs, TR/EN notes) with `metering_designer/instruments/layout.py` (`compute_instrument_layout`, `summarize_layout`). Conditioner adds a dedicated upstream PT.
+- **SFG schematic** (`metering_designer/instruments/schematic.py`): single-line matplotlib drawing with upstream disturbance glyphs, flow conditioner symbol, per-meter drawing (plate/venturi/cone/USM/turbine/coriolis/vortex/PD), instrument bubble symbols + tags, straight-pipe dimension lines, and manufacturing-tolerance callout box; PNG serialization for reports.
+
+### Full i18n (Turkish / English)
+- `core/i18n.py` now hosts **300+ keys** in both TR and EN (parity enforced by `test_i18n_full_coverage`).
+- All 8 Streamlit pages **and** the 3 result components (`score_table`, `radar_chart`, `justification_card`) render through `get_text()`; language toggle updates header/nav/pages/table columns/help/validation messages.
+- Report generation is language-aware: `generate_excel_report(..., lang=)`, `generate_pdf_report(..., lang=)` with TR/EN section labels; PDF embeds the SFG schematic + instrument table rows.
+- Inspection page shows a tolerance annotated schematic and localized tabs/labels.
+
+### Metrology & Inspection
+- `calc_uncertainty_budget_detailed()` accepts `geometric_contribution_pct` to fold inspection-derived geometric deviation into the ISO 5168 budget (RSS-combined, GUM-propagated via `uncertainties`). Backward compatible (default 0.0).
+
+### Bugfixes & Hardening
+- **UI emit path**: syntax fix in `05_results.py`, `NPS_TO_OD` import fix in `02_process.py`, session-state initialization for project/process/requirements keys (Click-through no longer crashes).
+- **Scoring**: `classify_score()` handles exact 100.0 boundary; weight dicts are normalized (unknown keys dropped, sums to 1). Turkish fluid labels (`doğal_gaz`) normalize via `normalize_fluid_type()` in scoring + Ex classification.
+- **Backends**: pyaga8 non-unity composition raises `PanicException` (a `BaseException`) — now caught and normalization applied; CoolProp output units contract enforced (`g/mol`, `kmol/m³`); heating value computed internally (thermo branch could return negative Hc) with percent/fraction agreement.
+- **Sizing**: PD meter zero-viscosity div-by-zero guard; turbine negative pressure raises `ValueError`; ultrasound sizing feed guarded when design temp is 0°C.
+- **Safety**: Zone 0 protection recommendation added; `classify_ex()` uses normalized fluid type so Turkish labels resolve to natural gas.
+- **Materials/Piping**: `select_material()` no longer mutates the global `MATERIAL_RECOMMENDATIONS` dict; ambient/range temperature keys parsed in stress tables (`ambient`, `-29_to_40`); flange class selection no longer applies a hidden 1.05 margin; `calc_min_wall_thickness()` raises `ValueError` for mill tolerance ≥ 100 % instead of `ZeroDivisionError`.
+- **Inspection**: partial measurements report PENDING, failed checks prefixed `FAIL`; qualitative checks start from a neutral `None` value; reference values carry `nominal_angle`/`t_min_mm` and symbolic bounds (`1.5×d_hole`) resolved so inspection databases reference the right equipment dims.
+- **Report**: `_split_notes` accepts both list and string input.
+
+### Testing
+- New `tests/test_hardening.py` — 33 regression tests covering all hotspots above plus geometric-uncertainty correctness, page-compile checks, cross-language page smoke (`test_all_pages_render_tr_and_en`) and page-key coverage (`test_i18n_key_use_in_pages`).
+- New `tests/test_straight_pipe.py` (8), `tests/test_pdf_report.py` (lang + schematic + instrument rows), `tests/test_schematic.py`, `tests/test_instrument_layout.py`.
+- Full suite: **307 passed, 3 skipped**.
+
 ## v1.0.0 (2026-05-18) — Initial Release
 
 ### Core Engine

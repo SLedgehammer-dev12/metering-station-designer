@@ -95,9 +95,4 @@ def test_all_meters_gas():
         print(f"  {r.name_tr}: {r.total_score:.1f} ({r.tier_label})")
 
 
-if __name__ == "__main__":
-    test_classify_score()
-    test_scoring_gas()
-    test_scoring_liquid()
-    test_all_meters_gas()
-    print("\nAll tests passed!")
+

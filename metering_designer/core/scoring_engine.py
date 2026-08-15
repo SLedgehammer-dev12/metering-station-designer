@@ -1,8 +1,9 @@
 import json
 import os
-import math
 from dataclasses import dataclass, field
 from typing import Optional
+
+from metering_designer.meters.specs import normalize_fluid_type
 
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "knowledge")
 
@@ -58,7 +59,7 @@ TIER_THRESHOLDS = [
 
 def classify_score(score: float) -> tuple[str, str, str]:
     for lo, hi, tier, color, label in TIER_THRESHOLDS:
-        if lo <= score < hi:
+        if lo <= score <= hi:
             return tier, color, label
     return "—–", "red", "Önerilmez"
 
@@ -68,12 +69,19 @@ class MeterScorer:
         self.specs = load_json("meter_specs.json")
         self.scoring_cfg = load_json("meter_scoring.json")
         self.default_weights = dict(self.scoring_cfg["default_weights"])
-        self.weights = weights if weights else dict(self.default_weights)
+        user_weights = weights if weights else dict(self.default_weights)
 
         cat_cfg = self.scoring_cfg["categories"]
-        normalizer = sum(self.weights.get(k, v["weight"]) for k, v in cat_cfg.items())
-        for key in self.weights:
-            self.weights[key] /= normalizer
+        clean_user = {k: v for k, v in user_weights.items() if k in cat_cfg and isinstance(v, (int, float))}
+        merged = {k: clean_user.get(k, v["weight"]) for k, v in cat_cfg.items()}
+        normalizer = sum(merged.values())
+
+        self.weights = {}
+        if normalizer > 0:
+            for key, val in merged.items():
+                self.weights[key] = val / normalizer
+        else:
+            self.weights = dict(self.default_weights)
 
     def score_meter(self, meter_key: str, inputs: dict) -> ScoredMeter:
         cfg = self.scoring_cfg
@@ -129,7 +137,7 @@ class MeterScorer:
         self, crit_key: str, meter_data: dict, inputs: dict, cat_key: str
     ) -> tuple[float, str]:
         fluid = inputs.get("fluid_type", "gas")
-        is_gas = fluid.startswith("gas")
+        is_gas = normalize_fluid_type(fluid) == "gas"
         design_p = inputs.get("design_p_bar", 50.0)
         qmin = inputs.get("qmin", 0)
         qmax = inputs.get("qmax", 100)
@@ -297,7 +305,7 @@ class MeterScorer:
         weaknesses = []
 
         fluid = inputs.get("fluid_type", "gas")
-        is_gas = fluid.startswith("gas")
+        is_gas = normalize_fluid_type(fluid) == "gas"
 
         if categories["technical_fitness"].score >= 8:
             strengths.append("Teknik uygunluk yüksek - akışkan tipi ve aralık uygun")

@@ -4,7 +4,6 @@ ASME B31.3/4/8 based pipe wall thickness calculation.
 
 import json
 import os
-import math
 
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "..", "knowledge")
 
@@ -79,6 +78,8 @@ def calc_min_wall_thickness(
         tm = P_MPa * D / (2 * S)
 
     t_required = tm + CA
+    if mill_tolerance_pct >= 100:
+        raise ValueError("mill_tolerance_pct must be < 100%")
     t_with_mill = t_required / (1 - mill_tolerance_pct / 100)
 
     max_temp = mat.get("max_temp_C", 400)
@@ -132,7 +133,7 @@ def calc_flange_min_class(
     for cls in classes:
         pt_table = ratings[cls]
         max_p = _interpolate_stress(pt_table, design_t_C, temp_key_format="standard")
-        if max_p is not None and design_p_bar <= max_p * 1.05:
+        if max_p is not None and design_p_bar <= max_p:
             cls_num = int(cls.split("_")[1])
             return {
                 "flange_class": cls_num,
@@ -153,15 +154,10 @@ def _interpolate_stress(table: dict, temp_C: float, temp_key_format: str = "stan
     temps = []
     values = []
     for k, v in table.items():
-        try:
-            if temp_key_format == "standard":
-                t = float(k.replace("_", "-").split("_")[-1]) if "_" in k else float(k)
-            else:
-                t = float(k)
+        t = _parse_temp_key(k)
+        if t is not None:
             temps.append(t)
             values.append(float(v))
-        except (ValueError, TypeError):
-            continue
 
     if not temps:
         return None
@@ -180,3 +176,20 @@ def _interpolate_stress(table: dict, temp_C: float, temp_key_format: str = "stan
             return vals_sorted[i] + ratio * (vals_sorted[i + 1] - vals_sorted[i])
 
     return vals_sorted[-1]
+
+
+def _parse_temp_key(k: str) -> float | None:
+    """Parse temperature table keys including 'ambient' and '-29_to_40'."""
+    s = str(k).strip().lower()
+    if s == "ambient":
+        return 20.0
+    s = s.replace("_", " ")
+    s = s.replace("to ", " ")
+    parts = [p for p in s.split() if p]
+    digit_parts = [p for p in parts if p.lstrip("-").replace(".", "").isdigit()]
+    if digit_parts:
+        return float(digit_parts[0])
+    try:
+        return float(k)
+    except (ValueError, TypeError):
+        return None

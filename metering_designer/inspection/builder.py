@@ -36,7 +36,7 @@ CONDITIONER_MAP = {
     "cpa_50e":    ("inspection_conditioners.json", "conditioner_cpa"),
     "tube_bundle_19": ("inspection_conditioners.json", "conditioner_tube_bundle"),
     "perforated":  ("inspection_conditioners.json", "conditioner_perforated"),
-    "gallagher":   ("inspection_conditioners.json", "conditioner_perforated"),
+    "gallagher":   ("inspection_conditioners.json", "conditioner_gallagher"),
 }
 
 PIPING_KEY = ("inspection_piping.json", "piping")
@@ -72,7 +72,12 @@ def build_inspection_checklist(
         D_mm=D_mm,
     )
 
-    reference_values = {"D": D_mm, "beta": beta or 0.6, "nps": nps, "OD": _nps_to_od(nps), "d": (beta or 0.6) * D_mm}
+    reference_values = {
+        "D": D_mm, "beta": beta or 0.6, "nps": nps, "OD": _nps_to_od(nps),
+        "d": (beta or 0.6) * D_mm,
+        "nominal_angle": 45.0,          # USM transducer mounting angle (°)
+        "t_min_mm": round(D_mm / 27.0, 2),  # ~B31.3 typical wall for NPS 8 (Sch 40 ≈ D/27)
+    }
 
     # Meter-specific components
     keys = COMPONENT_MAP.get(meter_type, [])
@@ -89,7 +94,17 @@ def build_inspection_checklist(
         data = _load_json(filename)
         comp_data = data["components"].get(comp_key)
         if comp_data:
-            comp = _build_component(comp_data, reference_values, lang)
+            # Reference values specific to check conditioner hole/length specs.
+            # hole_count is declared per conditioner; derive d_hole from the
+            # line bore assuming ~50% open area (Zanker/CPA) when unknown.
+            cond_ref = dict(reference_values)
+            hole_count = comp_data.get("hole_count")
+            if hole_count:
+                cond_ref["d_hole"] = D_mm * (0.5 / hole_count) ** 0.5
+            else:
+                cond_ref["d_hole"] = reference_values["d"]
+            cond_ref["d_tube"] = D_mm / 5.0  # 19-tube bundle common geometry
+            comp = _build_component(comp_data, cond_ref, lang)
             report.components.append(comp)
 
     # Always add piping for all meter types
@@ -149,7 +164,9 @@ def _build_component(comp_data: dict, ref: dict, lang: str) -> ComponentInspecti
             options=param_data.get("options", []),
         )
         if param.is_qualitative and param.options:
-            param.qualitative_value = param.options[0]["value"]
+            # Leave unset (PENDING) until measured; never auto-mark PASS.
+            # UI writes the chosen value back via evaluation.
+            param.qualitative_value = None
         comp.parameters.append(param)
 
     return comp
@@ -166,11 +183,16 @@ def evaluate_report(report: InspectionReport) -> InspectionReport:
     """
     Re-evaluates all statuses (after user fills in measurements).
     Also updates tolerance ranges based on actual measurements.
+    Only sets nominal=measured when the nominal was truly unset (nominal==0
+    AND no tolerance bounds were defined at all).
     """
     for comp in report.components:
         for param in comp.parameters:
             if not param.is_qualitative:
                 for pt in param.points:
-                    if pt.measured is not None and pt.nominal == 0:
+                    if (pt.measured is not None
+                            and pt.nominal == 0
+                            and pt.tol_lower is None
+                            and pt.tol_upper is None):
                         pt.nominal = pt.measured
     return report

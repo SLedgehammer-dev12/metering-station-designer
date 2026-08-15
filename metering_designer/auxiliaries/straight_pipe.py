@@ -1,6 +1,7 @@
 """
 ISO 5167 / AGA 3 / AGA 7 / AGA 9 straight pipe length requirements.
 """
+from metering_designer.piping import nps_to_od_m
 
 STRAIGHT_LENGTH_TABLE = {
     "single_bend_90": {
@@ -52,6 +53,7 @@ FLOW_CONDITIONER_REDUCTION = {
     "zanker": {"upstream": 2, "downstream": 10, "notes": "ISO 5167-1 Tablo 4"},
     "cpa_50e": {"upstream": 2, "downstream": 6, "notes": "ISO 5167-1 Tablo 4"},
     "perforated": {"upstream": 2, "downstream": 8, "notes": "Generic, no ISO compliance"},
+    "gallagher": {"upstream": 2, "downstream": 5, "notes": "AGA 9 referenced"},
 }
 
 
@@ -62,7 +64,7 @@ def calc_straight_pipe(
     with_conditioner: str = None,
     beta_ratio: float = 0.6,
 ) -> dict:
-    od_m = nps * 0.0254 if nps <= 48 else nps * 25.4 / 1000
+    od_m = nps_to_od_m(nps)
 
     meter_type = _map_meter_key(meter_key)
     config_data = STRAIGHT_LENGTH_TABLE.get(upstream_config)
@@ -81,6 +83,8 @@ def calc_straight_pipe(
         if cond:
             upstream_D = cond["upstream"] + cond["downstream"]
             downstream_D = 5
+    elif meter_type == "orifice":
+        upstream_D = _beta_adjusted_upstream(upstream_D, beta_ratio)
 
     upstream_m = upstream_D * od_m
     downstream_m = downstream_D * od_m
@@ -93,7 +97,24 @@ def calc_straight_pipe(
         "total_required_m": round(upstream_m + downstream_m, 3),
         "meter_type": meter_type,
         "upstream_config": upstream_config,
+        "beta_ratio": beta_ratio if meter_type == "orifice" else None,
+        "with_conditioner": with_conditioner,
+        "conditioner_notes": FLOW_CONDITIONER_REDUCTION.get(with_conditioner, {}).get("notes", "")
+        if with_conditioner else None,
     }
+
+
+def _beta_adjusted_upstream(base_D: float, beta: float) -> float:
+    if beta <= 0.3:
+        return max(base_D * 0.6, 8)
+    elif beta <= 0.5:
+        return max(base_D * 0.8, 10)
+    elif beta <= 0.65:
+        return base_D
+    elif beta <= 0.75:
+        return base_D * 1.3
+    else:
+        return base_D * 1.6
 
 
 def _map_meter_key(key: str) -> str:
