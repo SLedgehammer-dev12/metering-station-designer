@@ -2,7 +2,7 @@
 
 All notable changes to Metering Station Designer.
 
-## Unreleased
+## [1.1.0] - 2026-08-15
 
 ### Automatic Update Check
 - On startup, the app checks the GitHub releases API (`core/updates.py`) in a background thread and shows a sidebar banner when a newer release exists (`update_available`), along with `git pull` + `pip install` instructions; otherwise it shows the current version (`app_version`). Offline/SSL/404 failures degrade gracefully to a no-update result — the check never blocks the UI and runs at most once every 6 hours per process via an in-memory cache. `get_app_version()` reads from package metadata or `pyproject.toml`; `compare_versions()` uses `packaging.Version`.
