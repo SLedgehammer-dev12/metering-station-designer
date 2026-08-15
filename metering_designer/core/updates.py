@@ -30,7 +30,14 @@ RELEASES_TO_SCAN = 10
 
 # Asset names produced by .github/workflows/build.yml.
 _WINDOWS_ASSET_RE = re.compile(r"Windows.*\.zip$", re.IGNORECASE)
-_MACOS_ASSET_RE = re.compile(r"macOS.*\.zip$", re.IGNORECASE)
+_MACOS_ASSET_RE = re.compile(r"macOS.*\.(?:zip|dmg)$", re.IGNORECASE)
+# Preferred asset for each platform when a release offers several (e.g. both
+# a drag-and-drop .dmg and a legacy .zip on macOS); lower rank wins.
+_PREFERRED_EXTENSIONS = {
+    "darwin": (".dmg", ".zip"),
+}
+# Rank an asset name: smaller number is preferred, None is a mismatch.
+_EXT_RANK = {ext: i for i, ext in enumerate((".dmg", ".zip", ".7z", ".exe", ".msi"))}
 # Release tags: optional 'v', numeric version, optional platform suffix.
 _TAG_RE = re.compile(
     r"^[vV]?(\d+(?:\.\d+){1,3})(?:[-_.]?(win|windows|mac|macos|darwin))?$",
@@ -160,13 +167,33 @@ def select_platform_asset(assets: list[dict] | None, platform: str | None = None
         pattern = _WINDOWS_ASSET_RE
     if pattern is None:
         return None
+
+    def _rank_name(name: str) -> int | None:
+        if not pattern.search(name):
+            return None
+        base = name.lower()
+        preferred = _PREFERRED_EXTENSIONS.get(platform, ())
+        for candidate in preferred:
+            if base.endswith(candidate):
+                return _EXT_RANK.get(candidate, len(_EXT_RANK))
+        return len(_EXT_RANK) + 1  # matches pattern but not a preferred ext
+
+    best = None
+    best_rank = None
     for asset in assets or []:
-        if pattern.search(asset.get("name", "")):
-            return {
-                "name": asset["name"],
-                "browser_download_url": asset.get("browser_download_url", ""),
-                "digest": asset.get("digest", ""),
-            }
+        name = asset.get("name", "")
+        rank = _rank_name(name)
+        if rank is None:
+            continue
+        if best is None or rank < best_rank:
+            best = asset
+            best_rank = rank
+    if best is not None:
+        return {
+            "name": best["name"],
+            "browser_download_url": best.get("browser_download_url", ""),
+            "digest": best.get("digest", ""),
+        }
     return None
 
 

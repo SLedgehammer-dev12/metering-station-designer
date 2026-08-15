@@ -73,18 +73,22 @@ jobs:
         run: |
           python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])" > VERSION
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (.app bundle)
         run: |
-          pyinstaller --onedir --console --name MeteringStationDesigner --add-data "knowledge:knowledge" --add-data "VERSION:." --hidden-import=streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab streamlit_app/app.py
+          pyinstaller --windowed --name MeteringStationDesigner --add-data "knowledge:knowledge" --add-data "VERSION:." --hidden-import=streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab streamlit_app/app.py
 
       - name: Ad-hoc codesign
         run: |
-          codesign --force --deep -s - "dist/MeteringStationDesigner"
+          codesign --force --deep -s - "dist/MeteringStationDesigner.app"
+          codesign --verify --deep --strict "dist/MeteringStationDesigner.app"
 
-      - name: Verify and Zip
+      - name: Build DMG
         run: |
-          ls -la dist/MeteringStationDesigner/
-          ditto -c -k --keepParent dist/MeteringStationDesigner MeteringStationDesigner_macOS_arm64.zip
+          mkdir -p dmg_stage
+          cp -R "dist/MeteringStationDesigner.app" dmg_stage/
+          ln -s /Applications dmg_stage/Applications
+          hdiutil create -volname "MeteringStationDesigner" -srcfolder dmg_stage -ov -format UDZO MeteringStationDesigner_macOS_arm64.dmg
+          ls -la MeteringStationDesigner_macOS_arm64.dmg
 
       - name: Upload to Release
         run: |
@@ -93,7 +97,7 @@ jobs:
           release=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/$tag")
           upload_url=$(echo "$release" | python -c "import sys,json;print(json.load(sys.stdin)['upload_url'].split('{')[0])")
-          curl -s -X POST "$upload_url?name=MeteringStationDesigner_macOS_arm64.zip" \
+          curl -s -X POST "$upload_url?name=MeteringStationDesigner_macOS_arm64.dmg" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/zip" \
-            --data-binary "@MeteringStationDesigner_macOS_arm64.zip"
+            -H "Content-Type: application/x-apple-diskimage" \
+            --data-binary "@MeteringStationDesigner_macOS_arm64.dmg"

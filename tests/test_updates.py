@@ -58,6 +58,35 @@ def test_select_platform_asset_none_when_missing():
     assert updates.select_platform_asset([], platform="darwin") is None
 
 
+def test_select_platform_asset_matches_dmg():
+    assets = [_asset("MeteringStationDesigner_macOS_arm64.dmg")]
+    hit = updates.select_platform_asset(assets, platform="darwin")
+    assert hit is not None
+    assert hit["name"].endswith(".dmg")
+
+
+def test_select_platform_asset_prefers_dmg_over_zip_on_darwin():
+    assets = [_asset("MeteringStationDesigner_macOS_arm64.zip"),
+              _asset("MeteringStationDesigner_macOS_arm64.dmg")]
+    hit = updates.select_platform_asset(assets, platform="darwin")
+    assert hit is not None
+    assert hit["name"].endswith(".dmg")
+
+
+def test_select_platform_asset_zip_fallback_when_no_dmg():
+    assets = [_asset("MeteringStationDesigner_macOS_arm64.zip")]
+    hit = updates.select_platform_asset(assets, platform="darwin")
+    assert hit is not None
+    assert hit["name"].endswith(".zip")
+
+
+def test_select_platform_asset_dmg_ignored_on_windows():
+    assets = [_asset("MeteringStationDesigner_Windows.zip"),
+              _asset("MeteringStationDesigner_macOS_arm64.dmg")]
+    hit = updates.select_platform_asset(assets, platform="win32")
+    assert hit is not None and "Windows" in hit["name"]
+
+
 # ---------------------------------------------------- per-platform release track
 
 def test_find_platform_release_windows_only_does_not_satisfy_macos():

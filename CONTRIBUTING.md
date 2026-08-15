@@ -80,9 +80,9 @@ tag suffix selects which platforms get a new package:
 
 | Tag | Builds | Assets |
 |-----|--------|--------|
-| `v1.2.0` | Windows + macOS | `MeteringStationDesigner_Windows.zip`, `MeteringStationDesigner_macOS_arm64.zip` |
+| `v1.2.0` | Windows + macOS | `MeteringStationDesigner_Windows.zip`, `MeteringStationDesigner_macOS_arm64.dmg` |
 | `v1.2.0-win` | Windows only | `MeteringStationDesigner_Windows.zip` |
-| `v1.2.0-mac` | macOS only | `MeteringStationDesigner_macOS_arm64.zip` |
+| `v1.2.0-mac` | macOS only | `MeteringStationDesigner_macOS_arm64.dmg` |
 
 Rules:
 - Any platform release bumps the base version in `pyproject.toml` (minor/patch); the
