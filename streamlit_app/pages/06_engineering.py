@@ -70,9 +70,41 @@ st.subheader(t("engineering_meter_sizing"))
 meter_key = selected.meter_key
 meter_details = {}
 
+# --- Design standard selector (per-meter-type, standards framework) ---
+from metering_designer.standards.design_standards import list_standards, default_standard
+
+_std_options = list_standards(meter_key)
+_design_standard = st.session_state.get("design_standard", {})
+if _std_options:
+    _cur_std = _design_standard.get(meter_key, default_standard(meter_key))
+    _std_ids = [o["id"] for o in _std_options]
+    if _cur_std not in _std_ids:
+        _cur_std = _std_ids[0]
+    _std_names = [o["name"] for o in _std_options]
+    _std_choice = st.selectbox(
+        t("engineering_standard_label"), _std_ids,
+        format_func=lambda sid: next((o["name"] for o in _std_options if o["id"] == sid), sid),
+        index=_std_ids.index(_cur_std),
+        key=f"std_select_{meter_key}",
+    )
+    _design_standard[meter_key] = _std_choice
+    st.session_state["design_standard"] = _design_standard
+    st.caption(t("engineering_standard_caption"))
+    _std_prof = next((o for o in list_standards(meter_key) if o["id"] == _std_choice), None)
+    if _std_prof and _std_prof.get("description_key"):
+        st.info(t(_std_prof["description_key"]))
+
 if "orifice" in meter_key:
-    from metering_designer.meters.orifice import size_orifice_for_flow
-    meter_details = size_orifice_for_flow(qmax, qmin, od_mm * 0.88, oper_p, oper_t, rho_oper, mu, Z_oper, rho_std)
+    from metering_designer.meters.orifice import size_orifice_for_flow, generate_design_advisories
+    _dp_default = int(proc.get("dp_design_mbar", 250))
+    _dp_min, _dp_max = 20, 1000
+    dp_design = st.number_input(t("engineering_dp_design"), min_value=_dp_min, max_value=_dp_max,
+                                value=_dp_default, step=50, help=t("engineering_dp_design_help"),
+                                key="dp_design_mbar_input")
+    proc["dp_design_mbar"] = int(dp_design)
+    meter_details = size_orifice_for_flow(qmax, qmin, od_mm * 0.88, oper_p, oper_t, rho_oper, mu, Z_oper, rho_std,
+                                          tap_type=None, standard=_std_choice if _std_options else None,
+                                          dp_design_mbar=int(dp_design))
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_beta_ratio"), f"{meter_details.get('beta', 0):.4f}")
@@ -84,15 +116,30 @@ if "orifice" in meter_key:
     with col_d:
         st.metric(t("metric_dp_qmax"), f"{meter_details.get('dp_at_qmax_mbar', 0):.0f} mbar")
     with col_e:
-        st.metric(t("metric_dp_perm"), f"{meter_details.get('dp_permanent_mbar', 0):.0f} mbar")
+        st.metric(t("metric_dp_at_qmin"), f"{meter_details.get('dp_at_qmin_mbar', 0):.1f} mbar")
     with col_f:
+        st.metric(t("metric_dp_perm"), f"{meter_details.get('dp_permanent_mbar', 0):.0f} mbar")
+    col_g, col_h, col_i = st.columns(3)
+    with col_g:
         st.metric(t("metric_re"), f"{meter_details.get('Re', 0):.0f}")
+    with col_h:
+        st.metric(t("metric_turndown"), f"1:{meter_details.get('turndown_actual', 0):.0f}")
+    with col_i:
+        st.metric(t("metric_tap_type"), meter_details.get("tap_type_description", "").split("(")[0].strip())
     if meter_details.get("notes"):
         st.caption(meter_details["notes"])
+    for adv in generate_design_advisories(meter_details.get("beta", 0),
+                                          meter_details.get("dp_at_qmin_mbar", 0),
+                                          meter_details.get("dp_design_mbar", dp_design)):
+        if adv["level"] == "warning":
+            st.warning(t(adv["key"]).format(**adv.get("values", {})))
+        else:
+            st.info(t(adv["key"]).format(**adv.get("values", {})))
 
 elif "ultrasonic" in meter_key:
     from metering_designer.meters.ultrasonic import size_ultrasonic
-    meter_details = size_ultrasonic(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std)
+    meter_details = size_ultrasonic(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std,
+                                    standard=_std_choice if _std_options else None)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_usm_config"), f"{meter_details.get('recommended_paths', 4)}-yollu")

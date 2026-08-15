@@ -4,6 +4,14 @@ All notable changes to Metering Station Designer.
 
 ## [1.2.0] - 2026-08-15
 
+### Design-Standard Framework (staged)
+- **Standard-per-meter selection**: new `metering_designer/standards/design_standards.py` registry (`list_standards` / `get_standard` / `default_standard`) with profiles for **orifice** (`iso5167_2` + `aga3`) and **ultrasonic** (`aga9` + `iso17089`). Unimplemented meter types return an empty list so the UI keeps the selector hidden until profiles are added in a later update.
+- **Engineering page standard selector**: after meter selection the design standard picker appears; the chosen standard drives the calculation defaults, limits and references (`06_engineering.py`).
+- **User-selectable design ΔP (orifice)**: `dp_design_mbar` input (20–1000 mbar) on `06_engineering.py`; `size_orifice_for_flow` now sizes for the chosen ΔP (default 250 mbar preserved) and β is derived from the standard equation.
+- **Advisory messages**: `generate_design_advisories()` in `orifice.py` returns structured guidance — β in/out of recommended band (0.2–0.65), low ΔP@Qmin (transmitter accuracy risk), design-ΔP confirmation — rendered as `st.info`/`st.warning` in the UI.
+- **Standard-aware calculations**: `calc_beta_ratio`/`size_orifice_for_flow` accept `standard` and resolve tap-type defaults per standard (ISO → corner, AGA-3 → flange); `size_ultrasonic` accepts `standard` and applies the profile's velocity limits; results carry `standard` / `standard_name` / `standard_ref`. Audit-trail provenance now uses the resolved `standard_ref`.
+- New i18n keys (TR + EN): `engineering_standard_label`, `engineering_dp_design*`, `metric_dp_at_qmin`, `metric_turndown`, `metric_tap_type`, `std_*` advisory/description keys.
+
 ### Platform-Aware Releases & macOS Support
 - **macOS build** in `.github/workflows/build.yml`: `build-macos` job runs on `macos-latest` (Apple Silicon, arm64), produces `MeteringStationDesigner_macOS_arm64.zip` with ad-hoc `codesign --force --deep -s -` and uploads it to the release alongside the Windows zip.
 - **Per-platform release tags**: `v1.2.0` (both platforms), `v1.2.0-win` (Windows only), `v1.2.0-mac` (macOS only). Each build job is gated with `if: contains(github.ref, '-mac'/' -win')` so a single-platform fix only rebuilds that platform.

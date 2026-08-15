@@ -22,6 +22,42 @@ def list_tap_types() -> list:
     ]
 
 
+def _standard_profile(tap_type: str | None, standard: str | None) -> dict:
+    """Resolve the design standard profile and reconcile the tap default.
+
+    Returns a merged dict with ``standard`` (id), ``standard_name``,
+    ``standard_ref``, ``tap_type`` and the beta/advisory limits.
+    """
+    from metering_designer.standards.design_standards import get_standard
+
+    profile = get_standard("orifice", standard) or {}
+    std_id = (standard or "iso5167_2").lower()
+    if std_id not in ("iso5167_2", "aga3"):
+        std_id = "iso5167_2"
+
+    # A standard with a mandated default tap wins only when the caller did not
+    # pick one explicitly (tap_type defaults to the standard's default tap).
+    resolved_tap = tap_type
+    if resolved_tap is None:
+        resolved_tap = profile.get("default_tap", "corner")
+    if resolved_tap not in TAP_TYPES:
+        resolved_tap = "corner"
+
+    return {
+        "standard": std_id,
+        "standard_name": profile.get("name", "ISO 5167-2:2022"),
+        "standard_ref": profile.get("standard_ref", "ISO 5167-2:2022"),
+        "tap_type": resolved_tap,
+        "tap_type_description": TAP_TYPES[resolved_tap]["description"],
+        "beta_limits": profile.get("beta_limits", (0.1, 0.75)),
+        "beta_recommended": profile.get("beta_recommended", (0.2, 0.65)),
+        "D_min_mm": profile.get("D_min_mm", 50.0),
+        "dp_recommended_mbar": profile.get("dp_recommended_mbar", 250),
+        "dp_range_mbar": profile.get("dp_range_mbar", (20, 1000)),
+        "cd_formula": profile.get("cd_formula", "Reader-Harris/Gallagher (1998)"),
+    }
+
+
 def calc_beta_ratio(
     qm_kg_s: float,
     D_mm: float,
@@ -29,6 +65,7 @@ def calc_beta_ratio(
     mu_Pa_s: float,
     dp_target_Pa: float = 25000,
     tap_type: str = "corner",
+    standard: str | None = None,
 ) -> dict:
     """
     Calculate orifice beta ratio (d/D) for a given mass flow rate.
@@ -40,11 +77,16 @@ def calc_beta_ratio(
         rho_kg_m3: fluid density [kg/m³]
         mu_Pa_s: dynamic viscosity [Pa·s]
         dp_target_Pa: target differential pressure [Pa] (default 250 mbar)
+        tap_type: tap type; when None the selected standard's default is used
+        standard: design standard id ('iso5167_2' or 'aga3')
     """
-    if tap_type not in TAP_TYPES:
+    if tap_type is not None and tap_type not in TAP_TYPES:
         raise ValueError(
             f"Unknown tap_type '{tap_type}'. Available options: {', '.join(TAP_TYPES.keys())}"
         )
+    std = _standard_profile(tap_type, standard)
+    tap_type = std["tap_type"]
+    beta_limit_lo, beta_limit_hi = std["beta_limits"]
 
     D_m = D_mm / 1000
     A_pipe = math.pi * (D_m / 2) ** 2
@@ -75,10 +117,10 @@ def calc_beta_ratio(
         target_factor = 1.0
         beta_new = beta * math.pow(factor, 0.25) if factor > 0 else beta
 
-        if beta_new < 0.1:
-            beta_new = 0.1
-        elif beta_new > 0.75:
-            beta_new = 0.75
+        if beta_new < beta_limit_lo:
+            beta_new = beta_limit_lo
+        elif beta_new > beta_limit_hi:
+            beta_new = beta_limit_hi
 
         if abs(beta_new - beta) < 1e-5:
             beta = beta_new
@@ -86,7 +128,7 @@ def calc_beta_ratio(
         beta = beta_new
 
     # Final Cd with converged β
-    beta = max(0.1, min(beta, 0.75))
+    beta = max(beta_limit_lo, min(beta, beta_limit_hi))
     d_mm = beta * D_mm
     Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
     eps = _expansibility_factor(beta, dp_target_Pa, 4.5e6)
@@ -97,15 +139,15 @@ def calc_beta_ratio(
     pl_ratio = 1.0 - (beta ** 1.9)
     dp_permanent_Pa = dp_target_Pa * pl_ratio
 
-    # Check β limits per ISO 5167-2
-    beta_ok = 0.1 <= beta <= 0.75
+    # Check β limits per selected standard
+    beta_ok = beta_limit_lo <= beta <= beta_limit_hi
     re_limits_ok = _check_Re_limits(beta, Re, D_mm)
 
     return {
         "beta": round(beta, 5),
         "d_mm": round(d_mm, 3),
         "Cd": round(Cd, 5),
-        "Cd_formula": "Reader-Harris/Gallagher (1998)",
+        "Cd_formula": std["cd_formula"],
         "expansibility_eps": round(eps, 5),
         "Re": round(Re, 0),
         "dp_orifice_Pa": round(dp_target_Pa, 0),
@@ -115,9 +157,50 @@ def calc_beta_ratio(
         "beta_valid": beta_ok,
         "Re_valid": re_limits_ok,
         "tap_type": tap_type,
-        "tap_type_description": TAP_TYPES.get(tap_type, {}).get("description", ""),
-        "notes": _generate_notes(beta, beta_ok),
+        "tap_type_description": std["tap_type_description"],
+        "standard": std["standard"],
+        "standard_name": std["standard_name"],
+        "standard_ref": std["standard_ref"],
+        "beta_limits": list(std["beta_limits"]),
+        "beta_recommended": list(std["beta_recommended"]),
+        "notes": _generate_notes(beta, beta_ok, std),
     }
+
+
+def generate_design_advisories(beta: float, dp_at_qmin_mbar: float,
+                               dp_design_mbar: float, standard: dict | None = None) -> list[dict]:
+    """Produce structured advisory messages for the design dP and β choice.
+
+    Each entry: {'level': 'info'|'warning', 'key': <i18n key>, 'values': {...}}.
+    Used by the engineering UI to guide the user toward a well-conditioned
+    orifice design per the selected standard.
+    """
+    from metering_designer.standards.design_standards import get_standard
+
+    profile = standard or get_standard("orifice", "iso5167_2") or {}
+    beta_rec_lo, beta_rec_hi = profile.get("beta_recommended", (0.2, 0.65))
+    beta_lo, beta_hi = profile.get("beta_limits", (0.1, 0.75))
+
+    advisories = []
+    if beta_rec_lo <= beta <= beta_rec_hi:
+        advisories.append({"level": "info", "key": "std_adv_beta_ok",
+                           "values": {"lo": beta_rec_lo, "hi": beta_rec_hi}})
+    elif beta > beta_hi or beta < beta_lo:
+        advisories.append({"level": "warning", "key": "std_adv_beta_out_of_limits",
+                           "values": {"lo": beta_lo, "hi": beta_hi}})
+    elif beta > beta_rec_hi:
+        advisories.append({"level": "warning", "key": "std_adv_beta_high",
+                           "values": {"hi": beta_rec_hi}})
+    elif beta < beta_rec_lo:
+        advisories.append({"level": "warning", "key": "std_adv_beta_low",
+                           "values": {"lo": beta_rec_lo}})
+
+    if dp_at_qmin_mbar < 10:
+        advisories.append({"level": "warning", "key": "std_adv_dp_low",
+                           "values": {"dp": dp_at_qmin_mbar}})
+    advisories.append({"level": "info", "key": "std_adv_dp_design",
+                       "values": {"dp": dp_design_mbar}})
+    return advisories
 
 
 def _discharge_coefficient_rhg(beta: float, Re: float, D_mm: float, tap_type: str = "corner") -> float:
@@ -178,15 +261,17 @@ def _check_Re_limits(beta: float, Re: float, D_mm: float) -> bool:
     return Re >= 20000
 
 
-def _generate_notes(beta: float, beta_ok: bool) -> str:
+def _generate_notes(beta: float, beta_ok: bool, std: dict | None = None) -> str:
+    std = std or {}
+    beta_rec_lo, beta_rec_hi = std.get("beta_recommended", (0.2, 0.65))
     notes = []
     if not beta_ok:
-        notes.append("β ISO 5167-2 sınırları dışında (0.1-0.75)")
-    if beta > 0.6:
-        notes.append("β > 0.6, belirsizlik artar; β < 0.6 önerilir")
-    if beta < 0.2:
-        notes.append("β < 0.2, düşük duyarlılık; daha küçük DP aralığı düşünün")
-    return "; ".join(notes) if notes else "β sınırlar içinde"
+        notes.append("β seçilen standardın sınırları dışında")
+    if beta > beta_rec_hi:
+        notes.append(f"β > {beta_rec_hi}, belirsizlik artar; β < {beta_rec_hi} önerilir")
+    if beta < beta_rec_lo:
+        notes.append(f"β < {beta_rec_lo}, düşük duyarlılık; daha küçük DP aralığı düşünün")
+    return "; ".join(notes) if notes else "β önerilen sınırlar içinde"
 
 
 def size_orifice_for_flow(
@@ -199,14 +284,24 @@ def size_orifice_for_flow(
     mu_Pa_s: float,
     Z: float,
     rho_std_kg_m3: float,
-    tap_type: str = "corner",
+    tap_type: str | None = None,
+    standard: str | None = None,
+    dp_design_mbar: float | None = None,
 ) -> dict:
-    """Size orifice meter for given gas flow range."""
+    """Size orifice meter for given gas flow range.
+
+    design the plate for a user-selectable differential pressure at maximum
+    flow and a user-selectable design standard.
+    """
+    std = _standard_profile(tap_type, standard)
+    resolved_tap = std["tap_type"]
+
+    dp_max_Pa = (dp_design_mbar if dp_design_mbar else std["dp_recommended_mbar"]) * 100
     qm_max = q_max_Sm3h * rho_std_kg_m3 / 3600
     qm_min = q_min_Sm3h * rho_std_kg_m3 / 3600
-    dp_max_Pa = 25000
 
-    result = calc_beta_ratio(qm_max, D_mm, rho_kg_m3, mu_Pa_s, dp_max_Pa, tap_type=tap_type)
+    result = calc_beta_ratio(qm_max, D_mm, rho_kg_m3, mu_Pa_s, dp_max_Pa,
+                             tap_type=resolved_tap, standard=std["standard"])
 
     D_m = D_mm / 1000
     A_pipe = math.pi * (D_m / 2) ** 2
@@ -217,6 +312,10 @@ def size_orifice_for_flow(
     result["turndown_ok"] = turndown_actual >= 10
     result["dp_at_qmin_mbar"] = round(dp_min / 100, 2)
     result["dp_at_qmax_mbar"] = round(dp_max_Pa / 100, 1)
+    result["dp_design_mbar"] = round(dp_max_Pa / 100, 1)
+    result["standard"] = std["standard"]
+    result["standard_name"] = std["standard_name"]
+    result["standard_ref"] = std["standard_ref"]
     result["velocity_ms"] = round(qm_max / (rho_kg_m3 * A_pipe), 2) if rho_kg_m3 > 0 and A_pipe > 0 else 0
 
     return result
@@ -286,19 +385,22 @@ def calc_beta_ratio_result(
     mu_Pa_s: float,
     dp_target_Pa: float = 25000,
     tap_type: str = "corner",
+    standard: str | None = None,
 ) -> Result:
     """Calculate orifice beta ratio with provenance tracking."""
     result = Result()
     try:
-        data = calc_beta_ratio(qm_kg_s, D_mm, rho_kg_m3, mu_Pa_s, dp_target_Pa, tap_type=tap_type)
+        data = calc_beta_ratio(qm_kg_s, D_mm, rho_kg_m3, mu_Pa_s, dp_target_Pa,
+                               tap_type=tap_type, standard=standard)
         result.data = data
         result.add_provenance(
             function_name="calc_beta_ratio",
-            parameters={"tap_type": tap_type, "dp_target_Pa": dp_target_Pa},
-            standard_ref="ISO 5167-2:2003",
+            parameters={"tap_type": tap_type, "dp_target_Pa": dp_target_Pa,
+                        "standard": data.get("standard", "iso5167_2")},
+            standard_ref=data.get("standard_ref", "ISO 5167-2:2022"),
         )
         if not data.get("beta_valid", False):
-            result.warnings.append("Beta ratio outside ISO 5167-2 recommended range (0.1-0.75)")
+            result.warnings.append("Beta ratio outside selected standard's β limits")
     except Exception as e:
         result.errors.append(str(e))
     return result

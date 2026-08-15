@@ -143,7 +143,7 @@ def test_orifice_with_provenance():
     assert len(result.provenance) >= 1
     p = result.provenance[0]
     assert p["function"] == "calc_beta_ratio"
-    assert p["standard_ref"] == "ISO 5167-2:2003"
+    assert p["standard_ref"] == "ISO 5167-2:2022"
 
 
 def test_orifice_beta_data():

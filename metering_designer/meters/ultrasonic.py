@@ -6,6 +6,22 @@ Ultrasonic meter sizing and path configuration.
 import math
 
 
+def _standard_profile(standard: str | None) -> dict:
+    """Resolve the USM design standard profile (velocity limits, references)."""
+    from metering_designer.standards.design_standards import get_standard
+
+    profile = get_standard("ultrasonic", standard) or {}
+    std_id = (standard or "aga9").lower()
+    if std_id not in ("aga9", "iso17089"):
+        std_id = "aga9"
+    return {
+        "standard": std_id,
+        "standard_name": profile.get("name", "AGA Report No.9"),
+        "standard_ref": profile.get("standard_ref", "AGA Report No.9"),
+        "velocity_range": profile.get("velocity_range", (0.3, 30.0)),
+    }
+
+
 def size_ultrasonic(
     nps: int,
     q_max_Sm3h: float,
@@ -15,7 +31,10 @@ def size_ultrasonic(
     rho_kg_m3: float,
     mu_Pa_s: float,
     rho_std_kg_m3: float,
+    standard: str | None = None,
 ) -> dict:
+    std = _standard_profile(standard)
+    v_lo, v_hi = std["velocity_range"]
     od_mm = _nps_to_od(nps)
     id_mm = od_mm * 0.88
     id_m = id_mm / 1000
@@ -30,7 +49,7 @@ def size_ultrasonic(
     Re = rho_kg_m3 * v_max * id_m / mu_Pa_s if mu_Pa_s > 0 else 0
     turndown = q_max_Sm3h / q_min_Sm3h if q_min_Sm3h > 0 else float("inf")
 
-    velocity_ok = 0.3 <= v_max <= 30.0
+    velocity_ok = v_lo <= v_max <= v_hi
 
     # Path configuration
     if nps <= 4:
@@ -47,18 +66,18 @@ def size_ultrasonic(
         path_option = "8-path (chordal) - büyük çaplar"
 
     # Meter body sizing
-    if 0.3 <= v_max <= 25:
+    if v_lo <= v_max <= v_hi * 0.85:
         meter_size = nps
-        sizing_note = "Aynı çapta metre uygun"
-    elif v_max < 0.3:
+        sizing_note = f"{std['standard_name']} için aynı çapta metre uygun"
+    elif v_max < v_lo:
         meter_size = max(nps - 2, 2)
         sizing_note = f"Düşük hız, daha küçük metre (NPS {meter_size}) önerilir"
-    elif v_max > 30:
+    elif v_max > v_hi:
         meter_size = nps + 2
         sizing_note = f"Yüksek hız, daha büyük metre (NPS {meter_size}) düşünülmeli"
     else:
         meter_size = nps
-        sizing_note = "Hız kabul edilebilir"
+        sizing_note = f"Hız {std['standard_name']} sınırları içinde, kabul edilebilir"
 
     # Profile correction factor (k-factor)
     k_factor = _estimate_k_factor(recommended_paths, Re)
@@ -93,7 +112,10 @@ def size_ultrasonic(
         "typical_uncertainty_pct": uncertainty_typical,
         "straight_upstream_D": straight_up,
         "straight_downstream_D": 5,
-        "notes": _generate_usm_notes(v_max, velocity_ok, turndown),
+        "standard": std["standard"],
+        "standard_name": std["standard_name"],
+        "standard_ref": std["standard_ref"],
+        "notes": _generate_usm_notes(v_max, velocity_ok, turndown, std),
     }
 
 
@@ -104,6 +126,7 @@ def size_ultrasonic_with_fluid(
     fluid: "Fluid",
     P_oper_bar: float = 40.0,
     T_oper_C: float = 20.0,
+    standard: str | None = None,
 ) -> dict:
     """Wrapper around size_ultrasonic that accepts Fluid object.
 
@@ -114,6 +137,7 @@ def size_ultrasonic_with_fluid(
         fluid: Fluid dataclass instance
         P_oper_bar: operating pressure [bar]
         T_oper_C: operating temperature [°C]
+        standard: design standard id ('aga9' or 'iso17089')
     """
     from metering_designer.fluids.fluid import Fluid
 
@@ -123,7 +147,7 @@ def size_ultrasonic_with_fluid(
 
     return size_ultrasonic(
         nps, q_max_Sm3h, q_min_Sm3h, P_oper_bar, T_oper_C,
-        rho, mu, rho_std,
+        rho, mu, rho_std, standard=standard,
     )
 
 
@@ -132,15 +156,18 @@ def _estimate_k_factor(paths: int, Re: float) -> float:
     return base.get(paths, 1.003)
 
 
-def _generate_usm_notes(v_max: float, v_ok: bool, turndown: float) -> str:
+def _generate_usm_notes(v_max: float, v_ok: bool, turndown: float, std: dict | None = None) -> str:
+    std = std or {}
+    std_name = std.get("standard_name", "AGA 9")
+    v_lo, v_hi = std.get("velocity_range", (0.3, 30.0))
     notes = []
     if not v_ok:
-        notes.append(f"Hız {v_max:.1f} m/s AGA 9 sınırları dışında (0.3-30 m/s)")
+        notes.append(f"Hız {v_max:.1f} m/s {std_name} sınırları dışında ({v_lo}-{v_hi} m/s)")
     if turndown > 100:
-        notes.append(f"Turndown {turndown}:1 AGA 9 sınırını aşıyor (>100:1)")
+        notes.append(f"Turndown {turndown}:1 {std_name} sınırını aşıyor (>100:1)")
     if turndown <= 50:
         notes.append("Turndown limit içinde, optimum çalışma")
-    return "; ".join(notes) if notes else "Hız ve turndown AGA 9 sınırları içinde"
+    return "; ".join(notes) if notes else f"Hız ve turndown {std_name} sınırları içinde"
 
 
 def _nps_to_od(nps: int) -> float:
