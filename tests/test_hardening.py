@@ -574,3 +574,66 @@ def test_inspection_report_points_render_schematic():
             plt.close(fig)
             drawn += 1
     assert drawn >= 10
+
+
+def test_get_app_version_reads_pyproject():
+    from metering_designer.core.updates import get_app_version
+    v = get_app_version()
+    import re
+    assert re.match(r"^\d+\.\d+(\.\d+)?", v), v
+
+
+def test_compare_versions_basic():
+    from metering_designer.core.updates import compare_versions
+    assert compare_versions("1.0.0", "1.1.0") is True
+    assert compare_versions("1.1.0", "1.0.0") is False
+    assert compare_versions("1.0.0", "1.0.0") is False
+    assert compare_versions("1.0.0", "2.0.0") is True
+    assert compare_versions("1.0.0", "1.0.1") is True
+    assert compare_versions("v1.0.0", "v1.0.2") is True
+
+
+def test_compare_versions_garbage_never_newer():
+    from metering_designer.core.updates import compare_versions
+    assert compare_versions("1.0.0", "garbage") is False
+    assert compare_versions("1.0.0", "") is False
+    assert compare_versions("1.0.0", None) is False
+
+
+def test_check_in_background_caches_result_and_never_blocks():
+    from metering_designer.core.updates import check_in_background, reset_check_cache
+
+    reset_check_cache()
+    first = check_in_background()
+    # While a check is in flight we must get a usable (non-blocking) dict back.
+    assert isinstance(first, dict)
+    assert "update_available" in first
+    assert "latest" in first
+
+    import time
+    deadline = time.time() + 10
+    done = False
+    while time.time() < deadline:
+        res = check_in_background()
+        if res.get("latest") is not None or res.get("error") is not None:
+            done = True
+            break
+        time.sleep(0.15)
+    reset_check_cache()
+    assert done, "background update check never completed"
+
+
+def test_check_in_background_offline_degrades_gracefully(monkeypatch):
+    from metering_designer.core import updates
+    from metering_designer.core.updates import check_in_background, reset_check_cache
+
+    def _boom(*a, **k):
+        raise OSError("no network")
+
+    monkeypatch.setattr(updates, "fetch_latest_release_tag", _boom)
+    reset_check_cache()
+    res = check_in_background()
+    # Offline still returns a usable dict; the app must not crash.
+    assert isinstance(res, dict)
+    assert res.get("update_available") in (True, False)
+    reset_check_cache()

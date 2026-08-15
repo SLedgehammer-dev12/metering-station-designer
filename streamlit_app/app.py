@@ -2,6 +2,8 @@ import os
 
 import streamlit as st
 
+from metering_designer.core.i18n import get_text
+
 st.set_page_config(
     page_title="Ölçüm İstasyonu Dizayn Asistanı",
     page_icon="📊",
@@ -26,11 +28,26 @@ if lang_choice != lang:
     st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Faz 3 - v0.3.0**")
-st.sidebar.markdown("Standart bazlı çok kriterli dizayn")
+st.sidebar.markdown("**" + get_text("app_phase_label", lang) + "**")
+st.sidebar.markdown(get_text("app_phase_desc", lang))
 st.sidebar.markdown("---")
 
-from metering_designer.core.i18n import get_text
+# Automatic update check (runs once per process; result cached)
+from metering_designer.core.updates import check_in_background, get_app_version
+
+_app_version = get_app_version()
+_update = check_in_background()
+if _update.get("update_available"):
+    _v = _update.get("latest", "")
+    with st.sidebar.expander(f":rocket: {get_text('update_available', lang).format(v=_v)}", expanded=True):
+        st.markdown(get_text("update_instruction", lang))
+    st.sidebar.success(f"{get_text('app_version', lang)}: v{_app_version}")
+elif _update.get("error") is None and _update.get("latest"):
+    st.sidebar.caption(f"{get_text('app_version', lang)}: v{_app_version} · {get_text('update_latest', lang).format(v=_update['latest'])}")
+else:
+    st.sidebar.caption(f"{get_text('app_version', lang)}: v{_app_version}")
+
+st.sidebar.markdown("---")
 
 PAGE_KEYS = ["project", "process", "requirements", "weights", "results", "engineering", "report", "inspection"]
 _PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pages")

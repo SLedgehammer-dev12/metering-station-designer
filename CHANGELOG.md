@@ -4,6 +4,10 @@ All notable changes to Metering Station Designer.
 
 ## Unreleased
 
+### Automatic Update Check
+- On startup, the app checks the GitHub releases API (`core/updates.py`) in a background thread and shows a sidebar banner when a newer release exists (`update_available`), along with `git pull` + `pip install` instructions; otherwise it shows the current version (`app_version`). Offline/SSL/404 failures degrade gracefully to a no-update result — the check never blocks the UI and runs at most once every 6 hours per process via an in-memory cache. `get_app_version()` reads from package metadata or `pyproject.toml`; `compare_versions()` uses `packaging.Version`.
+- Click-through hardening for the version banner: version/update text is fully localized via new i18n keys (`update_available`, `update_latest`, `update_instruction`, etc.).
+
 ### UI Stability & Unit Selection
 - **Stable widget identities**: all Streamlit widgets across `app.py` + 8 pages now carry explicit `key=` (nav buttons, nav radio, unit selectors). Previously, widgets without keys got position-based auto-IDs, so a change in the widget tree above a nav button (e.g. the H2S toggle or fluid composition grid) silently shifted the button's ID and browser click-through broke. Sidebar page radio is pre-synced (`page_nav_radio`) and all `rerun()`s follow it.
 - **Selectable process units with live conversion** on `02_process.py`: pressure (`barg/psig/kPa/MPa`), temperature (`°C/°F/K`) and flow (`Sm³/h/m³/h/MMscf/h`) pickers; changing a unit immediately re-displays the field value in the new unit via `convert_display()` (pint) while the underlying `proc[]` values stay SI (`bar`, `°C`, `Sm³/h`). `scf`/`mmscf` defined in `core/units.py`.
