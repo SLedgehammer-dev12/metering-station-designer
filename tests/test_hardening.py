@@ -483,3 +483,94 @@ def test_i18n_key_use_in_pages():
             if m.group(1) not in tr_keys:
                 missing.append((fname, m.group(1)))
     assert not missing, f"missing i18n keys: {missing}"
+
+
+def test_convert_display_pressure_units():
+    from metering_designer.core.units import convert_display
+    assert abs(convert_display(40, "bar", "psi") - 580.15) < 0.1
+    assert abs(convert_display(580.15, "psi", "bar") - 40) < 0.01
+    assert abs(convert_display(100, "kPa", "bar") - 1.0) < 0.001
+
+
+def test_convert_display_temperature_units():
+    from metering_designer.core.units import convert_display
+    assert abs(convert_display(25, "degC", "degF") - 77.0) < 0.1
+    assert abs(convert_display(77, "degF", "degC") - 25) < 0.1
+    assert abs(convert_display(0, "degC", "K") - 273.15) < 0.1
+
+
+def test_convert_display_flow_units():
+    from metering_designer.core.units import convert_display
+    assert abs(convert_display(10000, "Sm3/hour", "mmscf/hour") - 0.3531) < 0.001
+    assert abs(convert_display(1, "mmscf/hour", "Sm3/hour") - 28316.85) < 1.0
+    assert abs(convert_display(100, "m**3/hour", "Sm3/hour") - 100) < 1e-6
+
+
+def test_unit_selector_symmetry_all_options():
+    """Every UI unit option converts to every other option and back."""
+    from metering_designer.core.units import (PRESSURE_UNITS, TEMPERATURE_UNITS,
+                                              FLOW_UNITS, convert_display)
+    for options in (PRESSURE_UNITS, FLOW_UNITS):
+        for i, (_label1, unit1) in enumerate(options):
+            for _label2, unit2 in options[i + 1:]:
+                val_fwd = convert_display(10, unit1, unit2)
+                val_back = convert_display(val_fwd, unit2, unit1)
+                assert abs(val_back - 10) < 1e-6 * max(abs(10), abs(val_fwd))
+    for _label1, unit1 in TEMPERATURE_UNITS:
+        for _label2, unit2 in TEMPERATURE_UNITS:
+            val_fwd = convert_display(25, unit1, unit2)
+            val_back = convert_display(val_fwd, unit2, unit1)
+            assert abs(val_back - 25) < 1e-6 * max(1, abs(val_fwd))
+
+
+def test_measurement_schematic_renders_no_error():
+    import matplotlib
+    matplotlib.use("Agg")
+    from metering_designer.inspection.models import InspectionPoint
+    from metering_designer.instruments.schematic import (
+        render_measurement_points_schematic, _parse_point_position,
+    )
+    pts = [
+        InspectionPoint("0°@1D", 1.0, 1.0, 0.1, -0.1),
+        InspectionPoint("90°@1D", 2.0, 1.0, 0.1, -0.1),
+        InspectionPoint("45°@2D", 1.0, 1.0, 0.1, -0.1),
+    ]
+    fig = render_measurement_points_schematic("D — çap ölçümü", pts, nps=8, lang="tr")
+    import matplotlib.pyplot as plt
+    plt.close(fig)
+
+
+def test_parse_point_position_labels():
+    from metering_designer.instruments.schematic import _parse_point_position
+    assert _parse_point_position("0°@1D") == (0.0, 1.0)
+    assert _parse_point_position("90°@1D") == (90.0, 1.0)
+    assert _parse_point_position("90°") == (90.0, None)
+    assert _parse_point_position("2D") == (None, 2.0)
+    assert _parse_point_position("135°@1.5D") == (135.0, 1.5)
+    assert _parse_point_position("#1") == (None, None)
+
+
+def test_schematic_png_bytes_roundtrip():
+    from metering_designer.instruments.schematic import render_schematic_png_bytes
+    png = render_schematic_png_bytes("orifice", nps=8, lang="tr")
+    assert isinstance(png, bytes) and png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_inspection_report_points_render_schematic():
+    """Every non-qualitative parameter in a real orifice report draws a schematic."""
+    from metering_designer.inspection.builder import build_inspection_checklist
+    from metering_designer.inspection.models import InspectionPoint
+    from metering_designer.instruments.schematic import render_measurement_points_schematic
+    import matplotlib.pyplot as plt
+    report = build_inspection_checklist(meter_type="orifice", conditioner_type=None,
+                                        nps=8, beta=0.65, D_mm=202.7)
+    drawn = 0
+    for comp in report.components:
+        for param in comp.parameters:
+            if not param.points:
+                continue
+            fig = render_measurement_points_schematic(param.label, param.points,
+                                                      report.meter_type, report.nps, "tr")
+            plt.close(fig)
+            drawn += 1
+    assert drawn >= 10

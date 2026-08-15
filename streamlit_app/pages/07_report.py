@@ -21,7 +21,7 @@ eng = st.session_state.engineering or {}
 
 if not selected or not proc:
     st.warning(t("report_no_selection"))
-    if st.button(t("report_back_results")):
+    if st.button(t("report_back_results"), key="nav_report_back_results"):
         st.session_state.page = "results"
         st.rerun()
     st.stop()
@@ -254,6 +254,6 @@ st.download_button(t("report_dl_json"), data=json.dumps(json_data, indent=2, ens
                    file_name=f"veri_{st.session_state.project.get('name','proje')}.json", use_container_width=True)
 
 st.divider()
-if st.button(t("report_back_engineering"), use_container_width=True):
+if st.button(t("report_back_engineering"), use_container_width=True, key="nav_report_back_eng"):
     st.session_state.page = "engineering"
     st.rerun()

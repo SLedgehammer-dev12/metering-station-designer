@@ -32,7 +32,7 @@ req = st.session_state.requirements
 
 if not selected:
     st.warning(t("engineering_no_meter"))
-    if st.button(t("engineering_back_results")):
+    if st.button(t("engineering_back_results"), key="nav_eng_back_results"):
         st.session_state.page = "results"
         st.rerun()
     st.stop()
@@ -280,7 +280,7 @@ for c in conditioner_results:
 prev_sel = st.session_state.engineering.get("conditioner_selected", "none")
 sel_idx = cond_options.index(prev_sel) if prev_sel in cond_options else 0
 cond_key = st.selectbox(t("engineering_conditioner_select"), cond_options,
-                        format_func=lambda x: cond_labels.get(x, x), index=sel_idx)
+                        format_func=lambda x: cond_labels.get(x, x), index=sel_idx, key="eng_conditioner")
 if cond_key == "none":
     cond_key = None
 st.session_state.engineering["conditioner_selected"] = cond_key
@@ -390,10 +390,10 @@ st.divider()
 # Gezinme
 col_n1, col_n2 = st.columns(2)
 with col_n1:
-    if st.button("⬅️ Sonuçlara Dön", use_container_width=True):
+    if st.button("⬅️ Sonuçlara Dön", use_container_width=True, key="nav_eng_back_literal"):
         st.session_state.page = "results"
         st.rerun()
 with col_n2:
-    if st.button("📄 Raporu Görüntüle", use_container_width=True, type="primary"):
+    if st.button("📄 Raporu Görüntüle", use_container_width=True, type="primary", key="nav_eng_report"):
         st.session_state.page = "report"
         st.rerun()

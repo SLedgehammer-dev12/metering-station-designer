@@ -141,6 +141,166 @@ def condenser_label(key: str, lang: str) -> str:
     return labels.get(key, (key.title(), key.title()))[0 if lang != "en" else 1]
 
 
+def render_measurement_points_schematic(
+    param_label: str,
+    points: list,
+    meter_key: str = "orifice",
+    nps: int = 8,
+    lang: str = "tr",
+) -> "figure":
+    """Draw a measurement-point schematic for a single inspection parameter.
+
+    Shows where each 'hangi ölçü nereden' reading is taken:
+      * left panel — pipe cross-section with angular measurement points;
+      * right panel — axial measurement planes along the pipe (in D).
+    Points are coloured by their inspection status (PASS/FAIL/PENDING).
+    """
+    import math
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle
+
+    parsed = [_parse_point_position(p.position_label) for p in points]
+    has_angle = any(a is not None for a, _ in parsed)
+    has_axial = any(d is not None for _, d in parsed)
+
+    n_panels = (1 if has_angle else 0) + (1 if has_axial else 0)
+    fig, axes = plt.subplots(1, max(n_panels, 1), figsize=(4.6 * max(n_panels, 1), 3.8))
+    if max(n_panels, 1) == 1:
+        axes = [axes]
+    fig.patch.set_facecolor("white")
+
+    panel = 0
+    if has_angle:
+        ax = axes[panel]
+        panel += 1
+        ax.add_patch(Circle((0, 0), 1.0, linewidth=1.6, edgecolor="#333",
+                            facecolor="#e8f0f8"))
+        ax.add_patch(Circle((0, 0), 1.0, linewidth=0.8, edgecolor="#999",
+                            facecolor="none"))
+        ax.plot([-1.35, 1.35], [0, 0], color="#ccd6e0", linewidth=0.8)
+        ax.plot([0, 0], [-1.35, 1.35], color="#ccd6e0", linewidth=0.8)
+        for pt, (ang, _) in zip(points, parsed):
+            if ang is None:
+                continue
+            color = _MEASURE_COLOR.get(pt.status, "#9e9e9e")
+            rad = math.radians(ang)
+            x = 1.0 * math.sin(rad)
+            y = 1.0 * math.cos(rad)
+            ax.plot([0, x], [0, y], color=color, linewidth=1, alpha=0.4)
+            marker = "o" if pt.status in ("PASS", "FAIL") else "o"
+            ax.plot(x, y, marker=marker, markersize=8, color=color,
+                    markerfacecolor="white", markeredgewidth=1.6)
+            # Short 12h-style hour marker for the label side
+            lx = 1.35 * math.sin(rad)
+            ly = 1.35 * math.cos(rad)
+            ax.text(lx, ly, pt.position_label.replace("@", "\n"), ha="center",
+                    va="center", fontsize=6.5, color=color)
+        ax.set_xlim(-1.6, 1.6)
+        ax.set_ylim(-1.6, 1.6)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.set_title(_text(lang, "Kesit — açısal ölçüm noktaları",
+                           "Cross-section — angular measuring points"),
+                     fontsize=9, color="#1a5276")
+
+    if has_axial:
+        ax = axes[panel]
+        panel += 1
+        # Pipe side view along the run
+        ax.plot([-0.35, 3.6], [0, 0], color="#333", linewidth=3.0,
+                solid_capstyle="butt")
+        ax.plot([-0.35, 3.6], [0.30, 0.30], color="#555", linewidth=1.0,
+                linestyle="--", alpha=0.4)
+        ax.plot([-0.35, 3.6], [-0.30, -0.30], color="#555", linewidth=1.0,
+                linestyle="--", alpha=0.4)
+        used_d = sorted({d for _, d in parsed if d is not None})
+        label_counts = {}
+        for d in used_d:
+            label_counts[d] = sum(1 for _, dd in parsed if dd == d)
+        for d in used_d:
+            x = d
+            ax.plot([x, x], [-0.26, 0.26], color="#888", linewidth=1.0)
+            lx = max(x, 0.15)
+            ax.text(lx, 0.42, f"{d:+g}D\n({label_counts[d]} {_text(lang, 'nokta', 'pts')})",
+                    ha="center", va="bottom", fontsize=7, color="#444")
+        max_d = max(used_d) if used_d else 1.0
+        ax.set_xlim(min(used_d) - 0.8 if used_d else -0.8, max_d + 1.6)
+        ax.set_ylim(-0.9, 0.9)
+        ax.set_aspect("auto")
+        ax.axis("off")
+        ax.set_title(_text(lang, "Hat boyunca — ölçüm düzlemleri (D)",
+                           "Along the run — measuring planes (D)"),
+                     fontsize=9, color="#1a5276")
+
+    if n_panels == 1 and not has_angle and not has_axial:
+        # Single-point parameter: highlight the single measurement location
+        ax = axes[0]
+        ax.add_patch(Circle((0, 0), 1.0, linewidth=1.6, edgecolor="#333",
+                            facecolor="#e8f0f8"))
+        pt = points[0]
+        color = _MEASURE_COLOR.get(pt.status, "#9e9e9e")
+        ax.plot(0, 0, marker="o", markersize=9, color=color,
+                markerfacecolor="white", markeredgewidth=1.8)
+        ax.text(0.28, 0.0, pt.position_label, fontsize=8, color=color,
+                ha="left", va="center")
+        ax.set_xlim(-1.4, 1.6)
+        ax.set_ylim(-1.4, 1.4)
+        ax.set_aspect("equal")
+        ax.axis("off")
+        ax.set_title(_text(lang, "Ölçüm noktası",
+                           "Measurement point"),
+                     fontsize=9, color="#1a5276")
+
+    # Legend
+    handles = [
+        plt.Line2D([0], [0], marker="o", color="w", label=_text(
+            lang, "Geçti", "Pass"), markerfacecolor="white",
+            markeredgecolor=_MEASURE_COLOR["PASS"], markeredgewidth=1.6),
+        plt.Line2D([0], [0], marker="o", color="w", label=_text(
+            lang, "Kaldı", "Fail"), markerfacecolor="white",
+            markeredgecolor=_MEASURE_COLOR["FAIL"], markeredgewidth=1.6),
+        plt.Line2D([0], [0], marker="o", color="w", label=_text(
+            lang, "Beklemede", "Pending"), markerfacecolor="white",
+            markeredgecolor=_MEASURE_COLOR["PENDING"], markeredgewidth=1.6),
+    ]
+    fig.legend(handles=handles, loc="lower center", ncol=3,
+               fontsize=8, frameon=False, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle(param_label, fontsize=11, fontweight="bold", color="#1a5276")
+    fig.tight_layout(rect=(0, 0.045, 1, 0.97))
+    return fig
+
+
+_MEASURE_COLOR = {
+    "PASS": "#2e7d32",
+    "FAIL": "#c62828",
+    "PENDING": "#9e9e9e",
+    "CONDITIONAL": "#f9a825",
+}
+
+
+def _parse_point_position(label: str) -> tuple[float | None, float | None]:
+    """Parse a position label like '0°@1D' / '90°' / '1D' into (angle_deg, axial_D).
+
+    Angles measured clockwise from the test tap (12 o'clock = 0°).
+    Axial distances are expressed in diameters D from a reference plane.
+    """
+    import re
+
+    angle = None
+    m_ang = re.search(r"(\d+(?:\.\d+)?)\s*°", label)
+    if m_ang:
+        angle = float(m_ang.group(1))
+    axial = None
+    m_d = re.search(r"\-?(\d+(?:\.\d+)?)\s*D", label)
+    if m_d:
+        axial = float(m_d.group(1))
+    return angle, axial
+
+
 def render_schematic_png_bytes(
     meter_key: str,
     nps: int = 8,

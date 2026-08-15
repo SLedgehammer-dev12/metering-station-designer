@@ -35,11 +35,11 @@ else:
 
 col1, col2 = st.columns(2)
 with col1:
-    if st.button(t("weights_reset"), use_container_width=True):
+    if st.button(t("weights_reset"), use_container_width=True, key="nav_weights_reset"):
         st.session_state.weights = None
         st.rerun()
 with col2:
-    if st.button(t("weights_confirm"), use_container_width=True, type="primary"):
+    if st.button(t("weights_confirm"), use_container_width=True, type="primary", key="nav_weights_confirm"):
         if w_total == 100:
             normalized = {k: v / 100.0 for k, v in weights_input.items()}
             st.session_state.weights = normalized

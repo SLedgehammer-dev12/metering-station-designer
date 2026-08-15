@@ -20,7 +20,7 @@ weights = st.session_state.weights if st.session_state.weights else DEFAULT_WEIG
 
 if not proc or not proc.get("fluid_type"):
     st.warning(t("results_first_enter_process"))
-    if st.button(t("results_back_process")):
+    if st.button(t("results_back_process"), key="nav_results_back_process"):
         st.session_state.page = "process"
         st.rerun()
     st.stop()
@@ -94,7 +94,7 @@ if len(results) >= 2:
     with st.expander(t("results_compare"), expanded=False):
         st.caption(t("results_compare_caption"))
         compare = st.multiselect(t("results_compare_select"), [r.name_tr for r in results],
-                                  default=[r.name_tr for r in results[:3]])
+                                  default=[r.name_tr for r in results[:3]], key="results_compare_sel")
         if len(compare) >= 2:
             comp_meters = [r for r in results if r.name_tr in compare]
             comp_data = []
@@ -127,15 +127,15 @@ st.divider()
 if selected:
     col_nav1, col_nav2, col_nav3 = st.columns([1, 1, 1])
     with col_nav1:
-        if st.button(t("results_back_weights"), use_container_width=True):
+        if st.button(t("results_back_weights"), use_container_width=True, key="nav_results_back_weights"):
             st.session_state.page = "weights"
             st.rerun()
     with col_nav2:
-        if st.button(f"{t('results_confirm')} {selected.name_tr}", use_container_width=True, type="primary"):
+        if st.button(f"{t('results_confirm')} {selected.name_tr}", use_container_width=True, type="primary", key="nav_results_confirm"):
             st.session_state.selected_meter = selected
             st.session_state.page = "engineering"
             st.rerun()
     with col_nav3:
-        if st.button(t("results_recalc"), use_container_width=True):
+        if st.button(t("results_recalc"), use_container_width=True, key="nav_results_recalc"):
             st.session_state.results = None
             st.rerun()

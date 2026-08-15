@@ -47,7 +47,7 @@ with tab1:
     if "orifice" in meter_type:
         beta = st.number_input(t("inspection_beta"), min_value=0.1, max_value=0.75, value=0.65, step=0.01, key="insp_beta")
 
-    if st.button(t("inspection_build"), use_container_width=True, type="primary"):
+    if st.button(t("inspection_build"), use_container_width=True, type="primary", key="nav_insp_build"):
         report = build_inspection_checklist(
             meter_type=meter_type, conditioner_type=cond_type,
             nps=nps, beta=beta, D_mm=D_mm,
@@ -144,16 +144,29 @@ with tab1:
                                 pt.measured = val
                                 pt.nominal = (pt.nominal or val)
 
+            self_status = param.overall_status
+            if param.points and any(getattr(pt, "position_label", "") for pt in param.points):
+                try:
+                    from metering_designer.instruments.schematic import (
+                        render_measurement_points_schematic,
+                    )
+                    fig = render_measurement_points_schematic(
+                        param.label, param.points, meter_type, int(nps), lang,
+                    )
+                    st.pyplot(fig, use_container_width=True)
+                except Exception:
+                    pass
+
             st.divider()
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        if st.button(t("inspection_clear"), use_container_width=True):
+        if st.button(t("inspection_clear"), use_container_width=True, key="nav_insp_clear"):
             if "inspection_report" in st.session_state:
                 del st.session_state.inspection_report
             st.rerun()
     with col_b2:
-        if st.button(t("inspection_evaluate"), use_container_width=True, type="primary"):
+        if st.button(t("inspection_evaluate"), use_container_width=True, type="primary", key="nav_insp_evaluate"):
             evaluate_report(report)
             st.rerun()
 
@@ -303,5 +316,5 @@ with tab2:
         txt += f"Geometrik Belirsizlik Katkısı: {geo_unc:.4f}%\n"
         st.download_button(t("inspection_txt"), data=txt, file_name="denetim_ozet.txt", use_container_width=True)
 
-    if st.button(t("inspection_fix"), use_container_width=True):
+    if st.button(t("inspection_fix"), use_container_width=True, key="nav_insp_fix"):
         pass  # stays on same page, user clicks Tab 1 manually

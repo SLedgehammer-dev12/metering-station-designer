@@ -33,6 +33,14 @@ ureg.define("Sm3 = standard_cubic_meter")
 ureg.define("sm3 = Sm3")
 SM3 = ureg.standard_cubic_meter
 SM3_H = ureg.standard_cubic_meter / ureg.hour
+
+# Imperial standard gas volume (scf at 60°F, 14.696 psia) + MMscf
+ureg.define("standard_cubic_foot = 0.028316846592 * meter**3")
+ureg.define("scf = standard_cubic_foot")
+ureg.define("mmscf = 1e6 * standard_cubic_foot")
+SCF = ureg.standard_cubic_foot
+MMSCF = ureg.mmscf
+MMSCF_H = ureg.mmscf / ureg.hour
 MM = ureg.millimeter
 M = ureg.meter
 PA_S = ureg.pascal * ureg.second
@@ -229,3 +237,32 @@ class Length:
 
     def __repr__(self) -> str:
         return f"Length({self._q})"
+
+
+# UI unit selector options: (display_label, pint_unit_string)
+PRESSURE_UNITS = [
+    ("barg", "bar"),
+    ("psig", "psi"),
+    ("kPa", "kPa"),
+    ("MPa", "MPa"),
+]
+TEMPERATURE_UNITS = [
+    ("°C", "degC"),
+    ("°F", "degF"),
+    ("K", "K"),
+]
+FLOW_UNITS = [
+    ("Sm³/h", "Sm3/hour"),
+    ("m³/h", "m**3/hour"),
+    ("MMscf/h", "mmscf/hour"),
+]
+
+
+def convert_display(value, from_unit: str, to_unit: str) -> float:
+    """Convert a numeric display value between UI-selectable units.
+
+    Uses the pint registry; returns the converted magnitude. Plain numbers
+    are treated as being in ``from_unit``.
+    """
+    q = Q(value, from_unit)
+    return q.to(to_unit).magnitude

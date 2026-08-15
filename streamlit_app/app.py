@@ -19,7 +19,8 @@ lang = st.session_state.lang
 lang_labels = {"tr": "🇹🇷 Türkçe", "en": "🇬🇧 English"}
 lang_choice = st.sidebar.selectbox("Dil / Language", list(lang_labels.keys()),
                                     format_func=lambda x: lang_labels[x],
-                                    index=list(lang_labels.keys()).index(lang))
+                                    index=list(lang_labels.keys()).index(lang),
+                                    key="lang_select")
 if lang_choice != lang:
     st.session_state.lang = lang_choice
     st.rerun()
@@ -59,9 +60,10 @@ st.session_state.setdefault("engineering", None)
 st.session_state.setdefault("results", None)
 page_labels = {k: get_text(k, lang) for k in PAGE_KEYS}
 page_label_list = list(page_labels.values())
-current_idx = PAGE_KEYS.index(st.session_state.page)
+# Sync the sidebar radio to programmatic page changes made by page-bottom buttons
+st.session_state["page_nav_radio"] = page_labels.get(st.session_state.page, page_label_list[0])
 
-nav = st.sidebar.radio("Menü", page_label_list, index=current_idx)
+nav = st.sidebar.radio("Menü", page_label_list, key="page_nav_radio")
 # Map back from label to key
 for key, label in page_labels.items():
     if label == nav:
