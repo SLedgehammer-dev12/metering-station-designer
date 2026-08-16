@@ -358,3 +358,57 @@ def test_extreme_pressure_handling():
     except BaseException as exc:
         assert isinstance(exc, BaseException), f"unexpected crash at 1000 bar: {exc}"
         assert True
+
+
+# ---------------------------------------------------------------------------
+# 13. Extended components must not be folded into n-butane
+# ---------------------------------------------------------------------------
+
+def test_h2_co_components_not_folded_to_butane():
+    """H2/CO contribute their own molar mass, not be silently folded to n-butane.
+
+    The old mapping folded any unknown key into n_butane (58.12 g/mol), which
+    inflated M_mix. 5% H2 + 5% CO must give ≈ 15.9 g/mol, not ≈ 20 g/mol.
+    """
+    comp = {"C1": 0.90, "H2": 0.05, "CO": 0.05}
+    result = calc_z_factor(45, 40, comp)
+    # 0.90*16.043 + 0.05*2.016 + 0.05*28.010 = 15.94 g/mol
+    assert 15.0 < result["M_mix"] < 17.0, (
+        f"M_mix={result['M_mix']} wrong; H2/CO must not be folded to n-butane"
+    )
+
+
+def test_extended_components_sane_z():
+    """Ar/He/O2/CO/H2 in composition must not crash pyaga8 or distort Z."""
+    comp = {"C1": 0.90, "C2": 0.03, "N2": 0.02, "CO2": 0.02,
+            "H2": 0.01, "Ar": 0.005, "He": 0.005, "CO": 0.005, "O2": 0.005}
+    result = calc_z_factor(45, 40, comp)
+    assert 0.3 < result["Z"] < 1.0, f"Z={result['Z']} out of range"
+    assert result["density_kg_m3"] > 20
+    assert 15 < result["M_mix"] < 20
+
+
+# ---------------------------------------------------------------------------
+# 14. CoolProp AbstractState mixture path
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not HAS_COOLPROP, reason="CoolProp not installed")
+def test_coolprop_mixture_uses_mole_fractions():
+    """CoolProp Z must reflect the full composition, not pure methane.
+
+    PropsSI() has no mole-fraction argument; the fix routes mixtures through
+    AbstractState + set_mole_fractions. A 50/50 C1/C2 blend must give a Z that
+    differs measurably from pure methane at the same conditions.
+    """
+    from metering_designer.core.backends import _z_coolprop
+
+    z_mix, d_kmol, M, backend = _z_coolprop(45e5, 313.15, {"C1": 0.5, "C2": 0.5})
+    z_pure, _, _, _ = _z_coolprop(45e5, 313.15, {"C1": 1.0})
+
+    assert "mixture" in backend.lower(), f"expected mixture path, got {backend}"
+    assert abs(z_mix - z_pure) > 0.005, (
+        f"mixture Z ({z_mix}) must differ from pure methane ({z_pure})"
+    )
+    # Density contract: d_kmol in kmol/m³. 45 bar CH4/C2H6 ≈ 1.9 kmol/m³.
+    assert 0.5 < d_kmol < 5.0, f"d_kmol out of physical range: {d_kmol}"
+    assert 16 < M < 31, f"M_mix out of range for C1/C2 blend: {M}"

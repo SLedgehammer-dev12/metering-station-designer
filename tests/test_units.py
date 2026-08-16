@@ -8,6 +8,7 @@ from metering_designer.core.units import (
     Pressure, Temperature, MassFlowRate,
     Density, Viscosity, Length,
     validate_units, ureg, Q,
+    gauge_to_absolute,
 )
 
 
@@ -79,3 +80,19 @@ def test_validate_units_incompatible():
     q = Q(20, "degC")
     with pytest.raises(Exception):
         validate_units(q, ureg.pascal, "bad")
+
+
+def test_gauge_to_absolute_zero():
+    """0 barg → 1.01325 bar abs (standard atmosphere)."""
+    assert abs(gauge_to_absolute(0) - 1.01325) < 1e-6
+
+
+def test_gauge_to_absolute_typical():
+    """40 barg → 41.01325 bar abs; 5 barg → 6.01325 bar abs."""
+    assert abs(gauge_to_absolute(40) - 41.01325) < 1e-6
+    assert abs(gauge_to_absolute(5) - 6.01325) < 1e-6
+
+
+def test_gauge_to_absolute_negative():
+    """-0.5 barg (slight vacuum) → 0.51325 bar abs."""
+    assert abs(gauge_to_absolute(-0.5) - 0.51325) < 1e-6

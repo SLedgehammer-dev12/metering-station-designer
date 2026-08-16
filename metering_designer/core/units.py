@@ -240,6 +240,10 @@ class Length:
 
 
 # UI unit selector options: (display_label, pint_unit_string)
+# NOTE: the labels say gauge ("barg"/"psig") but the pint unit strings are
+# absolute ("bar"/"psi"). Thermodynamic calculations MUST use absolute pressure;
+# convert gauge inputs with gauge_to_absolute() before feeding them to
+# density/Z/flow equations. Design pressure for ASME wall thickness stays gauge.
 PRESSURE_UNITS = [
     ("barg", "bar"),
     ("psig", "psi"),
@@ -256,6 +260,15 @@ FLOW_UNITS = [
     ("m³/h", "m**3/hour"),
     ("MMscf/h", "mmscf/hour"),
 ]
+
+
+def gauge_to_absolute(bar_gauge: float) -> float:
+    """Convert a gauge pressure (bar) to absolute pressure (bar).
+
+    Adds standard atmospheric pressure (1.01325 bar). Thermodynamic and flow
+    equations always operate on absolute pressure.
+    """
+    return bar_gauge + 1.01325
 
 
 def convert_display(value, from_unit: str, to_unit: str) -> float:

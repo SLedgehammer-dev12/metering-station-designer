@@ -62,7 +62,7 @@ def calc_gas_properties(
     rho_oper = oper.get("density_kg_m3", 0)
 
     # Kinematic viscosity estimate
-    mu_gas = _calc_viscosity(M_mix, Z_oper, P_oper_bar, T_oper_K, comp_normalized)
+    mu_gas = _calc_viscosity(M_mix, Z_oper, P_oper_bar, T_oper_K, comp_normalized, rho_oper)
     nu_gas = mu_gas / rho_oper if rho_oper > 0 else 1e-6
 
     # ISO 6976 calorific value with thermo fallback
@@ -78,7 +78,8 @@ def calc_gas_properties(
 
     # Isentropic exponent (kappa = Cp/Cv) and speed of sound
     kappa_val = compute_isentropic_kappa(comp_normalized, T_oper_C)
-    sos_val = calc_speed_of_sound(T_oper_K, M_mix, kappa_val, rho_oper)
+    sos_val = calc_speed_of_sound_real(T_oper_K, M_mix, kappa_val, rho_oper, Z_oper,
+                                       P_oper_bar, T_oper_C, comp_normalized)
 
     return {
         "composition": comp_normalized,
@@ -122,17 +123,37 @@ def _pseudo_critical(composition: dict[str, float]) -> tuple[float, float]:
 
 
 def _calc_viscosity(M: float, Z: float, P_bar: float, T_K: float,
-                    composition: dict[str, float] = None) -> float:
+                    composition: dict[str, float] = None,
+                    rho_kg_m3: float = None) -> float:
+    """Dynamic viscosity of natural gas, Pa·s.
+
+    Primary: Lee-Gonzalez-Eakin (1966) correlation, the industry-standard
+    model for natural gas viscosity. It is density-based and correctly
+    captures the non-linear rise with pressure:
+        mu[cP] = 1e-4 · K · exp(X · (rho_g/62.4)^Y)
+        K = (9.4 + 0.02·M)·T^1.5 / (209 + 19·M + T),  T in °R
+        X = 3.5 + 986/T + 0.01·M
+        Y = 2.4 - 0.2·X
+        rho_g in lb/ft³, mu in cP.
+    Fallback: low-pressure ideal-gas correlation when density is unavailable.
+    """
+    if rho_kg_m3 is not None and rho_kg_m3 > 0:
+        T_R = T_K * 1.8  # K → °R
+        rho_lbft3 = rho_kg_m3 * 0.06242796
+        K_f = (9.4 + 0.02 * M) * T_R ** 1.5 / (209 + 19 * M + T_R)
+        X = 3.5 + 986 / T_R + 0.01 * M
+        Y = 2.4 - 0.2 * X
+        mu_cP = 1e-4 * K_f * math.exp(X * (rho_lbft3 / 62.4) ** Y)
+        return mu_cP * 1e-3  # cP → Pa·s
+
     if composition:
         Tc, Pc_bar = _pseudo_critical(composition)
     else:
         Tc, Pc_bar = 200.0, 50.0
 
-    P_Pa = P_bar * 1e5
     Tr = T_K / Tc if Tc > 0 else 1.0
     mu0 = 1e-6 * (0.807 * Tr ** 0.618 - 0.357 * math.exp(-0.449 * Tr) + 0.34)
-    Pc_Pa = Pc_bar * 1e5
-    return mu0 * (1 + 0.4 * P_Pa / Pc_Pa) if Pc_Pa > 0 else mu0
+    return mu0
 
 
 def _calc_calorific_values(comp: dict) -> tuple[float, float]:
@@ -202,19 +223,36 @@ def calc_kappa(cp: float, cv: float) -> float:
 
 
 def calc_speed_of_sound(
-    T_K: float, M_mix: float, kappa: float, rho_kg_m3: float
+    T_K: float, M_mix: float, kappa: float, rho_kg_m3: float, Z: float = 1.0
 ) -> float:
-    """Speed of sound in an ideal gas, m/s.
+    """Real-gas speed of sound approximation, m/s.
 
-    Uses c = sqrt(kappa * P / rho) with P from the ideal gas law.
+    Ideal-gas form c = sqrt(kappa·P/rho) reduces to sqrt(kappa·R·T/M) and is
+    independent of pressure. For a real gas the compressibility factor must be
+    included: c = sqrt(kappa·Z·R·T/M). Prefer the GERG-2008 acoustic speed
+    (``calc_speed_of_sound_real``) when available.
     """
     R = 8.314462618
-    P_Pa = (
-        rho_kg_m3 * R * T_K / (M_mix / 1000)
-        if rho_kg_m3 > 0
-        else 101325
-    )
-    return math.sqrt(kappa * P_Pa / rho_kg_m3) if rho_kg_m3 > 0 else 0
+    if M_mix <= 0 or T_K <= 0:
+        return 0.0
+    return math.sqrt(kappa * Z * R * T_K / (M_mix / 1000))
+
+
+def calc_speed_of_sound_real(
+    T_K: float, M_mix: float, kappa: float, rho_kg_m3: float,
+    Z: float, P_bar: float, T_C: float, composition: dict,
+) -> float:
+    """Real-gas speed of sound, m/s.
+
+    Uses the GERG-2008 acoustic speed (pyaga8 ``w``) when available, otherwise
+    falls back to the real-gas approximation with the compressibility factor.
+    """
+    from metering_designer.core.backends import calc_speed_of_sound_pyaga8
+
+    w = calc_speed_of_sound_pyaga8(P_bar, T_C, composition)
+    if w is not None and w > 0:
+        return w
+    return calc_speed_of_sound(T_K, M_mix, kappa, rho_kg_m3, Z)
 
 
 def compute_isentropic_kappa(
@@ -236,6 +274,8 @@ def compute_speed_of_sound_value(
     T_oper_C: float,
     M_mix: float = None,
     rho_kg_m3: float = None,
+    P_bar: float = None,
+    Z: float = 1.0,
 ) -> float:
     """Compute speed of sound for the gas mixture, m/s."""
     T_K = T_oper_C + 273.15
@@ -246,9 +286,9 @@ def compute_speed_of_sound_value(
         M_mix = sum(composition.get(c, 0) * masses.get(c, 20) for c in composition)
     if rho_kg_m3 is None:
         R = 8.314462618
-        P_bar = 1.01325  # standard pressure
+        P_bar = P_bar if P_bar is not None else 1.01325  # absolute bar
         rho_kg_m3 = (P_bar * 1e5) * M_mix / (1000 * R * T_K)
-    return calc_speed_of_sound(T_K, M_mix, kappa, rho_kg_m3)
+    return calc_speed_of_sound(T_K, M_mix, kappa, rho_kg_m3, Z)
 
 
 # ── Consistent API aliases (composition-first) ──────────────────────

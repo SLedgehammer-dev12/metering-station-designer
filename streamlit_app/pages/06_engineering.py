@@ -45,6 +45,9 @@ design_p = proc.get("design_p_bar", 50)
 design_t = proc.get("design_t_c", 50)
 oper_p = proc.get("oper_p_bar", 40)
 oper_t = proc.get("oper_t_c", 40)
+# UI pressures are entered as gauge (barg); thermodynamics need absolute.
+from metering_designer.core.units import gauge_to_absolute
+oper_p_abs = gauge_to_absolute(oper_p)
 qmin = proc.get("qmin", 5000)
 qmax = proc.get("qmax", 30000)
 qnorm = proc.get("qnormal", 10000)
@@ -55,7 +58,7 @@ od_mm = proc.get("od_mm", 219.1)
 gas = {"rho_oper_kg_m3": 40, "rho_std_kg_m3": 0.75, "mu_dynamic_Pa_s": 1.5e-6, "Z_oper": 0.9}
 if proc.get("composition") and proc.get("fluid_type") == "doğal_gaz":
     try:
-        gas = calc_gas_properties(proc["composition"], oper_p, oper_t, design_p, design_t)
+        gas = calc_gas_properties(proc["composition"], oper_p_abs, oper_t, design_p, design_t)
     except Exception:
         pass
 
@@ -102,7 +105,7 @@ if "orifice" in meter_key:
                                 value=_dp_default, step=50, help=t("engineering_dp_design_help"),
                                 key="dp_design_mbar_input")
     proc["dp_design_mbar"] = int(dp_design)
-    meter_details = size_orifice_for_flow(qmax, qmin, od_mm * 0.88, oper_p, oper_t, rho_oper, mu, Z_oper, rho_std,
+    meter_details = size_orifice_for_flow(qmax, qmin, od_mm * 0.88, oper_p_abs, oper_t, rho_oper, mu, Z_oper, rho_std,
                                           tap_type=None, standard=_std_choice if _std_options else None,
                                           dp_design_mbar=int(dp_design))
     col_a, col_b, col_c = st.columns(3)
@@ -138,7 +141,7 @@ if "orifice" in meter_key:
 
 elif "ultrasonic" in meter_key:
     from metering_designer.meters.ultrasonic import size_ultrasonic
-    meter_details = size_ultrasonic(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std,
+    meter_details = size_ultrasonic(nps, qmax, qmin, oper_p_abs, oper_t, rho_oper, mu, rho_std,
                                     standard=_std_choice if _std_options else None)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
@@ -156,7 +159,7 @@ elif "ultrasonic" in meter_key:
 
 elif "turbine" in meter_key:
     from metering_designer.meters.turbine import size_turbine
-    meter_details = size_turbine(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std)
+    meter_details = size_turbine(nps, qmax, qmin, oper_p_abs, oper_t, rho_oper, mu, rho_std)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_max_capacity"), f"{meter_details.get('q_act_max_m3h', 0):.0f} m³/h")
@@ -173,7 +176,7 @@ elif "turbine" in meter_key:
 
 elif "coriolis" in meter_key:
     from metering_designer.meters.coriolis import size_coriolis
-    meter_details = size_coriolis(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std)
+    meter_details = size_coriolis(nps, qmax, qmin, oper_p_abs, oper_t, rho_oper, mu, rho_std)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_meter_size"), f"NPS {meter_details.get('meter_size_inches', 2)}\"")
@@ -192,7 +195,7 @@ elif "positive_displacement" in meter_key or "pd" in meter_key:
     from metering_designer.meters.pd_meter import size_pd_meter
     q_act_max = qmax * rho_std / rho_oper if rho_oper > 0 else qmax
     q_act_min = qmin * rho_std / rho_oper if rho_oper > 0 else qmin
-    meter_details = size_pd_meter(nps, q_act_max, q_act_min, rho_oper, 5.0, oper_p, oper_t)
+    meter_details = size_pd_meter(nps, q_act_max, q_act_min, rho_oper, 5.0, oper_p_abs, oper_t)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_meter_size"), f"NPS {meter_details.get('meter_size_inches', nps)}\"")
@@ -210,7 +213,7 @@ elif "positive_displacement" in meter_key or "pd" in meter_key:
 elif "vortex" in meter_key:
     from metering_designer.meters.vortex import size_vortex
     is_gas = proc.get("fluid_type", "gas") in ("doğal_gaz", "gas")
-    meter_details = size_vortex(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std, is_gas)
+    meter_details = size_vortex(nps, qmax, qmin, oper_p_abs, oper_t, rho_oper, mu, rho_std, is_gas)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_vmax"), f"{meter_details.get('v_max_ms', 0):.1f} m/s")
@@ -232,7 +235,7 @@ elif "vortex" in meter_key:
 elif "v_cone" in meter_key or "vcone" in meter_key:
     from metering_designer.meters.vcone import size_v_cone
     is_gas = proc.get("fluid_type", "gas") in ("doğal_gaz", "gas")
-    meter_details = size_v_cone(nps, qmax, qmin, oper_p, oper_t, rho_oper, mu, rho_std, is_gas)
+    meter_details = size_v_cone(nps, qmax, qmin, oper_p_abs, oper_t, rho_oper, mu, rho_std, is_gas)
     col_a, col_b, col_c = st.columns(3)
     with col_a:
         st.metric(t("metric_beta_ratio"), f"{meter_details.get('beta', 0):.4f}")

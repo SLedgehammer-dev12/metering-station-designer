@@ -39,11 +39,18 @@ from metering_designer.core.result import Result
 R = 8.314462618
 DATASET_VERSION = "1.0"
 
+# pyaga8 Detail supports the full 21-component GERG-2008 set. Every key the
+# engine can emit must map to its pyaga8 field so unknown components are never
+# silently folded into n_butane (which distorts Pc/Tc and molar mass).
 COMPONENT_MAP_PYAGA8 = {
     "C1": "methane", "C2": "ethane", "C3": "propane",
     "iC4": "isobutane", "nC4": "n_butane", "iC5": "isopentane",
     "nC5": "n_pentane", "C6": "hexane", "C6plus": "hexane",
     "N2": "nitrogen", "CO2": "carbon_dioxide", "H2S": "hydrogen_sulfide",
+    "H2": "hydrogen", "He": "helium", "Ar": "argon", "O2": "oxygen",
+    "CO": "carbon_monoxide", "H2O": "water",
+    "nC7": "heptane", "C7": "heptane", "C8": "octane",
+    "C9": "nonane", "C10": "decane",
 }
 
 CP_FLUID_NAMES = {
@@ -51,6 +58,10 @@ CP_FLUID_NAMES = {
     "iC4": "IsoButane", "nC4": "n-Butane", "iC5": "Isopentane",
     "nC5": "n-Pentane", "C6": "n-Hexane",
     "N2": "Nitrogen", "CO2": "CarbonDioxide", "H2S": "HydrogenSulfide",
+    "H2": "Hydrogen", "He": "Helium", "Ar": "Argon", "O2": "Oxygen",
+    "CO": "CarbonMonoxide", "H2O": "Water",
+    "nC7": "n-Heptane", "C7": "n-Heptane", "C8": "n-Octane",
+    "C9": "n-Nonane", "C10": "n-Decane",
 }
 
 
@@ -62,15 +73,10 @@ def _make_pyaga8_comp(composition: dict[str, float]) -> "pyaga8.Composition":
         if mol > 0:
             setattr(comp, name, mol)
             total += mol
-    for key in composition:
-        if key not in COMPONENT_MAP_PYAGA8 and composition[key] > 0:
-            setattr(comp, "n_butane", getattr(comp, "n_butane", 0) + composition[key])
-            total += composition[key]
-    if abs(total - 1.0) > 0.001:
+    if abs(total - 1.0) > 0.001 and total > 0:
         for name in COMPONENT_MAP_PYAGA8.values():
             val = getattr(comp, name, 0)
-            if total > 0:
-                setattr(comp, name, val / total)
+            setattr(comp, name, val / total)
     # pyaga8 panics when fractions do not sum to exactly 1.0; force the last
     # nonzero component to absorb any floating-point residual.
     names = [n for n in COMPONENT_MAP_PYAGA8.values() if getattr(comp, n, 0) > 0]
@@ -106,14 +112,22 @@ def _z_coolprop(P_Pa: float, T_K: float, composition: dict) -> tuple[float, floa
         raise ValueError("No CoolProp-compatible components in composition")
 
     fluids_str = "&".join(x_clean.keys())
-    mole_frac = list(x_clean.values())
 
     try:
-        Z = CP.PropsSI("Z", "P", P_Pa, "T", T_K, fluids_str)
-        Dmass = CP.PropsSI("D", "P", P_Pa, "T", T_K, fluids_str)
-        Mmass = CP.PropsSI("M", "P", P_Pa, "T", T_K, fluids_str)
-        # Normalize units to the shared contract: d_kmol in kmol/m³, M in g/mol
-        return Z, Dmass / Mmass / 1000, Mmass * 1000, "CoolProp HEOS (GERG-2008 fallback)"
+        # PropsSI has no mole-fraction argument; pass the composition through
+        # AbstractState so mixture Z/density are computed at the real mole
+        # fractions instead of failing and falling back to pure methane.
+        AS = CP.AbstractState("HEOS", fluids_str)
+        AS.set_mole_fractions(list(x_clean.values()))
+        AS.update(CP.PT_INPUTS, P_Pa, T_K)
+        Z = AS.keyed_output(CP.iZ)
+        Dmass = AS.keyed_output(CP.iDmass)
+        MOLAR_MASSES = get_molar_masses()
+        # Molar mass from the internal table (g/mol == kg/kmol numerically).
+        M_gmol = sum(composition.get(k, 0) * MOLAR_MASSES.get(k, 0)
+                     for k in MOLAR_MASSES) / total if total > 0 else 20.0
+        # Contract: d_kmol in kmol/m³, M in g/mol.
+        return Z, Dmass / M_gmol, M_gmol, "CoolProp HEOS (GERG-2008 mixture)"
     except Exception:
         Z_meth = CP.PropsSI("Z", "P", P_Pa, "T", T_K, "Methane")
         D_meth = CP.PropsSI("D", "P", P_Pa, "T", T_K, "Methane")
@@ -149,6 +163,30 @@ def _z_internal(P_bar: float, T_C: float, composition: dict) -> tuple[float, flo
     d_kmol = result.get("density_kmol_m3", 0)
     M = result.get("M_mix", 20)
     return Z, d_kmol, M, "Internal DAK/Papay (pure Python)"
+
+
+def calc_speed_of_sound_pyaga8(P_bar: float, T_C: float, composition: dict) -> float | None:
+    """Real-gas speed of sound via pyaga8 Detail ``w`` (m/s), or None.
+
+    The ideal-gas formula c = sqrt(kappa·R·T/M) ignores the compressibility
+    gradient and is several percent off at high pressure. pyaga8 exposes the
+    GERG-2008 acoustic speed directly, so use it when available.
+    """
+    if not HAS_PYAGA8:
+        return None
+    try:
+        comp = _make_pyaga8_comp(composition)
+        d = pyaga8.Detail()
+        d.set_composition(comp)
+        d.pressure = P_bar * 100
+        d.temperature = T_C + 273.15
+        d.calc_density()
+        d.calc_properties()
+        w = getattr(d, "w", None)
+        return float(w) if w is not None else None
+    except BaseException:
+        # pyaga8 may panic (BaseException) on unsupported compositions.
+        return None
 
 
 def calc_z_factor(P_bar: float, T_C: float, composition: dict[str, float]) -> dict:

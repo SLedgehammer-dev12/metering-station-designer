@@ -326,6 +326,26 @@
       "aga8_b": 0.0,
       "viscosity_parameter": 0.014
     },
+    "He": {
+      "name": "Helium",
+      "molar_mass": 4.0026,
+      "critical_temp": 5.19,
+      "critical_pressure": 0.228,
+      "acentric_factor": -0.387,
+      "ideal_gross_cv_MJ_m3": 0,
+      "ideal_net_cv_MJ_m3": 0,
+      "aga8_E": 0.0,
+      "aga8_S": 0.0,
+      "aga8_K": 1.0,
+      "aga8_G": 0.0,
+      "aga8_Q": 0.0,
+      "aga8_F": 0.0,
+      "aga8_temperature_exponents": [0, -0.5, -1, -1.5, -2, -2.5, -3, -3.5, -4, -4.5, -5, 0, 0, 0, 0, 0, 0, 0],
+      "aga8_density_exponents": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3],
+      "aga8_eta_exponents": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 1, 2, 3],
+      "aga8_b": 0.0,
+      "viscosity_parameter": 0.006
+    },
     "nC7": {
       "name": "n-Heptane",
       "molar_mass": 100.203,
