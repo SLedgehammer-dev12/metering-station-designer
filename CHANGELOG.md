@@ -2,7 +2,7 @@
 
 All notable changes to Metering Station Designer.
 
-## [Unreleased] - engineering-accuracy fixes
+## [1.3.0] - 2026-08-17
 
 ### Real-Gas Thermodynamics (`core/backends.py`, `fluids/gas.py`)
 - `calc_speed_of_sound` is now Z-aware and `calc_speed_of_sound_real` was added (`pyaga8` `w` preferred, `√(κ·Z·R·T/M)` fallback).
