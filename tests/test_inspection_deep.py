@@ -1,6 +1,7 @@
 """Deep inspection tests (Agent: test-inspection)."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import pytest
 from metering_designer.inspection.builder import build_inspection_checklist, evaluate_report
 from metering_designer.inspection.tolerance_engine import compute_tolerance
 from metering_designer.inspection.uncertainty_impact import compute_geometric_uncertainty
@@ -10,6 +11,7 @@ from metering_designer.inspection.compliance_report import generate_compliance_r
 ALL_COMBOS = [
     ("orifice", "zanker"), ("ultrasonic", "cpa_50e"), ("turbine", None),
     ("coriolis", None), ("vcone", None), ("venturi", None),
+    ("vortex", None), ("positive_displacement", None),
 ]
 
 
@@ -18,6 +20,23 @@ def test_all_equipment_types():
         rep = build_inspection_checklist(meter, cond, 8, 0.6, 200)
         assert len(rep.components) >= 1
         assert rep.total_params > 0
+
+
+def test_vortex_and_pd_have_meter_specific_components():
+    """Vortex and PD reports must include their own body checks, not only piping."""
+    for meter, keyword in [("vortex", ("vortex", "vorteks")),
+                           ("positive_displacement", ("displacement", "pd"))]:
+        rep = build_inspection_checklist(meter, None, 8, 0.65)
+        assert len(rep.components) >= 2, f"{meter}: expected body + piping, got {len(rep.components)}"
+        names = " ".join(c.component_name.lower() for c in rep.components)
+        assert any(k in names for k in keyword), f"{meter}: no meter-specific component in {names}"
+
+
+def test_default_D_mm_uses_pipe_id():
+    """Without an explicit D_mm, the checklist must use the pipe internal ID."""
+    from metering_designer.piping import pipe_id_mm
+    rep = build_inspection_checklist("orifice", None, 8, 0.65)
+    assert rep.D_mm == pytest.approx(pipe_id_mm(8), abs=0.05)
 
 
 def test_tolerance_percentage():

@@ -1,0 +1,61 @@
+{
+  "metadata": {"standard": "API MPMS Ch. 5.2", "version": "1.0"},
+  "components": {
+    "pd_body": {
+      "name_tr": "PD Metre Gövdesi",
+      "name_en": "Positive Displacement Meter Body",
+      "standard": "API MPMS Ch. 5.2",
+      "parameters": {
+        "body_diameter": {
+          "label_tr": "Gövde İç Çapı",
+          "label_en": "Body Internal Diameter",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 0.3, "base_param": "D"},
+          "clause": "API MPMS 5.2 §4.2",
+          "criticality": "CRITICAL"
+        },
+        "rotor_clearance": {
+          "label_tr": "Rotor / Gövde Boşluğu",
+          "label_en": "Rotor / Housing Clearance",
+          "unit": "mm",
+          "points": {"count": 2, "labels": ["Giriş", "Çıkış"]},
+          "tolerance": {"type": "range", "min": 0.03, "max": 0.15},
+          "clause": "API MPMS 5.2 §4.3",
+          "criticality": "MAJOR",
+          "uncertainty_factor": 0.3
+        },
+        "rotor_alignment": {
+          "label_tr": "Rotor Eksen Hizalanması",
+          "label_en": "Rotor Axial Alignment",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 0.1},
+          "clause": "API MPMS 5.2 §4.3",
+          "criticality": "MAJOR"
+        },
+        "shaft_clearance": {
+          "label_tr": "Şaft / Rulman Boşluğu",
+          "label_en": "Shaft / Bearing Clearance",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "range", "min": 0.01, "max": 0.08},
+          "clause": "API MPMS 5.2 §4.4",
+          "criticality": "MAJOR"
+        },
+        "meter_factor_mark": {
+          "label_tr": "Metre Faktörü / Plaka Okunabilirliği",
+          "label_en": "Meter Factor / Plate Legibility",
+          "unit": "qualitative",
+          "points": {"count": 1},
+          "clause": "API MPMS 5.2 §6",
+          "criticality": "MINOR",
+          "options": [
+            {"value": "okunakli", "status": "PASS", "label_tr": "Okunaklı", "label_en": "Legible"},
+            {"value": "silik", "status": "FAIL", "label_tr": "Silik / Hatalı", "label_en": "Worn / Incorrect"}
+          ]
+        }
+      }
+    }
+  }
+}

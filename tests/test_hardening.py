@@ -321,8 +321,12 @@ def test_inspection_tube_length_symbolic_bounds():
 def test_geometric_uncertainty_empty_and_all_pass():
     from metering_designer.inspection.builder import build_inspection_checklist
     from metering_designer.inspection.uncertainty_impact import compute_geometric_uncertainty
-    rep = build_inspection_checklist("vortex", None, 8, 0.65, 202.7)  # piping-only report
+    rep = build_inspection_checklist("vortex", None, 8, 0.65, 202.7)
+    # Nothing measured yet → all PENDING → no geometric uncertainty contribution
     assert math.isclose(compute_geometric_uncertainty(rep), 0.0, abs_tol=1e-9)
+    # Vortex report must contain its own meter components, not only piping
+    names = " ".join(c.component_name.lower() for c in rep.components)
+    assert any(k in names for k in ("vortex", "vorteks")), f"no vortex component: {names}"
 
 
 # ─────────────────────────────────────────────

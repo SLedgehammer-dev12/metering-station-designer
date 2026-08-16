@@ -98,10 +98,10 @@ def render_schematic(
     # Meter symbol
     _draw_meter(ax, meter_key, od_m)
 
-    # Straight-pipe dimension lines & labels
-    _draw_dimension(ax, x0, -up_D, -0.20,
+    # Straight-pipe dimension lines & labels (both anchored at the meter)
+    _draw_dimension(ax, x0, 0, -0.20,
                     f"Up (D): {up_D:.0f}D = {up_D * od_m:.2f} m", "#1a5276")
-    _draw_dimension(ax, x0, x1, -0.20,
+    _draw_dimension(ax, 0, x1, -0.20,
                     f"Down (D): {down_D:.0f}D = {down_D * od_m:.2f} m", "#7d3c98")
 
     # Instruments

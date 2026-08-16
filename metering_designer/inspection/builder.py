@@ -27,8 +27,8 @@ COMPONENT_MAP = {
     "coriolis":   [("inspection_coriolis.json", "coriolis_body")],
     "vcone":      [("inspection_vcone.json", "vcone_body")],
     "venturi":    [("inspection_venturi.json", "venturi_body")],
-    "vortex":     [],
-    "positive_displacement": [],
+    "vortex":     [("inspection_vortex.json", "vortex_body")],
+    "positive_displacement": [("inspection_pd_meter.json", "pd_body")],
 }
 
 CONDITIONER_MAP = {
@@ -62,7 +62,8 @@ def build_inspection_checklist(
     lang: str = "tr",
 ) -> InspectionReport:
     if D_mm is None:
-        D_mm = _nps_to_od(nps) * 0.88  # approximate ID
+        from metering_designer.piping import pipe_id_mm
+        D_mm = pipe_id_mm(nps, schedule="40")
 
     report = InspectionReport(
         meter_type=meter_type,

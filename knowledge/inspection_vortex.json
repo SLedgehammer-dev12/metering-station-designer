@@ -1,0 +1,58 @@
+{
+  "metadata": {"standard": "ISO 12764:2017", "version": "1.0"},
+  "components": {
+    "vortex_body": {
+      "name_tr": "Vorteks Metre Gövdesi",
+      "name_en": "Vortex Meter Body",
+      "standard": "ISO 12764:2017",
+      "parameters": {
+        "body_diameter": {
+          "label_tr": "Gövde İç Çapı",
+          "label_en": "Body Internal Diameter",
+          "unit": "mm",
+          "points": {"count": 4, "angular_count": 4, "labels": ["0°","90°","45°","135°"]},
+          "tolerance": {"type": "percentage", "value": 0.3, "base_param": "D"},
+          "clause": "ISO 12764 §5.3",
+          "criticality": "CRITICAL"
+        },
+        "bluff_body_width": {
+          "label_tr": "Türbülans Cismi Genişliği (b)",
+          "label_en": "Bluff Body Width (b)",
+          "unit": "mm",
+          "points": {"count": 2, "labels": ["Cisim", "Karşıt Yön"]},
+          "tolerance": {"type": "percentage_or_absolute", "percentage": 0.5, "absolute_mm": 0.1, "base_param": "d", "use": "larger"},
+          "clause": "ISO 12764 §5.4",
+          "criticality": "CRITICAL",
+          "uncertainty_factor": 0.4
+        },
+        "bluff_body_position": {
+          "label_tr": "Türbülans Cismi Konumu (eksenel)",
+          "label_en": "Bluff Body Position (axial)",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 1.0},
+          "clause": "ISO 12764 §5.4",
+          "criticality": "MAJOR"
+        },
+        "sensor_probe_alignment": {
+          "label_tr": "Dedektör Prob Hizalanması",
+          "label_en": "Sensor Probe Alignment",
+          "unit": "mm",
+          "points": {"count": 1},
+          "tolerance": {"type": "percentage", "value": 0.1, "base_param": "D"},
+          "clause": "ISO 12764 §5.5",
+          "criticality": "MAJOR"
+        },
+        "surface_roughness": {
+          "label_tr": "Yüzey Pürüzlülüğü",
+          "label_en": "Surface Roughness",
+          "unit": "μm",
+          "points": {"count": 1},
+          "tolerance": {"type": "max_value", "value": 3.2},
+          "clause": "ISO 12764 §5.3",
+          "criticality": "MINOR"
+        }
+      }
+    }
+  }
+}

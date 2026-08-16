@@ -1,3 +1,4 @@
+import importlib.util
 import os
 
 import streamlit as st
@@ -160,4 +161,6 @@ if st.sidebar.button("🔄 Sıfırla"):
 
 page_file = os.path.join(_PAGE_DIR, PAGE_FILES.get(st.session_state.page, ""))
 if page_file and os.path.exists(page_file):
-    exec(open(page_file).read())
+    _spec = importlib.util.spec_from_file_location(f"page_{st.session_state.page}", page_file)
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)

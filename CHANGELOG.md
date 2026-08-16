@@ -2,6 +2,38 @@
 
 All notable changes to Metering Station Designer.
 
+## [Unreleased] - engineering-accuracy fixes
+
+### Real-Gas Thermodynamics (`core/backends.py`, `fluids/gas.py`)
+- `calc_speed_of_sound` is now Z-aware and `calc_speed_of_sound_real` was added (`pyaga8` `w` preferred, `√(κ·Z·R·T/M)` fallback).
+- `_calc_viscosity` rewritten with the density-based LGE correlation (low-pressure fallback retained); `calc_speed_of_sound_pyaga8` added.
+- `_z_coolprop` rewritten via `AbstractState("HEOS")` + `set_mole_fractions`; fixed a 1000× molar-density unit bug (`Dmass/M_gmol`).
+- `COMPONENT_MAP_PYAGA8` extended to the full 21-component pyaga8 map (H2, He, Ar, O2, CO, H2O, nC7, C7–C10…); unknown keys are no longer folded into n-butane.
+- `gauge_to_absolute()` added to `core/units.py`; the engineering page consumes absolute pressure (`oper_p_abs`) for gas properties and all sizing calls.
+
+### Standard-Driven Meter Sizing (`meters/*`, `auxiliaries/`)
+- `calc_beta_ratio` requires `p1_Pa` (absolute upstream pressure); the expansibility factor uses it instead of a hard-coded 4.5 MPa; results carry `p1_Pa_abs`.
+- Corner-tap `L1` corrected 0.5→1.0 (ISO 5167-2 D-D/2 taps).
+- Classical Venturi re-implemented per ISO 5167-4 (Cd=0.995, ISO ε, β iterated to the design ΔP, 15 % permanent loss).
+- V-Cone reports the physical cone diameter `d_cone = D·√(1−β²)` and effective throat `At = A_pipe·β²`; vortex dead K-factor line removed.
+- `pipe_id_mm(nps, schedule)` added to `piping/__init__.py`; orifice/V-Cone/vortex/USM sizing and the engineering page now use schedule-based IDs instead of `OD·0.88`.
+- Straight-pipe requirements and permanent-pressure-loss models per meter (vortex/V-Cone/Venturi/Coriolis/PD).
+
+### Piping & Safety (`piping/`, `safety/`)
+- Burst and B31.8 wall thickness now use SMYS; B31.8 applies the location-class design factor (0.72/0.60/0.50/0.40) plus temperature derating.
+- API RP 14E erosional-velocity C-factors updated to SI values (122 continuous / 152.5 intermittent).
+- IEC 60079-14: Ex d (flameproof) no longer recommended for Zone 0; gas detection may downgrade Zone 1→Zone 2 but never erases a hazardous zone.
+
+### Scoring & Validation (`core/`)
+- Removed unreachable `fluid_compatibility` branch; `estimated_dp_bar` now uses the physical Δp ∝ q² orifice scaling (≈250 mbar @ 30 000 Sm³/h) instead of a fabricated formula.
+- `validate_project_inputs`/`validate_all` return `(errors, warnings)`; a missing project location is now a warning, not a blocking error.
+
+### Inspection & Schematic (`inspection/`, `instruments/`, UI)
+- New vortex (`knowledge/inspection_vortex.json`, ISO 12764) and positive-displacement (`knowledge/inspection_pd_meter.json`, API MPMS 5.2) inspection components; their checklists no longer degenerate to piping-only.
+- Inspection default bore now uses `pipe_id_mm` (schedule 40) instead of `OD·0.88`.
+- SFG schematic straight-pipe dimension lines are anchored at the meter (previously the "down" line spanned the whole run).
+- `streamlit_app/app.py` loads pages via `importlib.util` instead of `exec(open(...).read())`.
+
 ## [1.2.0] - 2026-08-15
 
 ### Design-Standard Framework (staged)
