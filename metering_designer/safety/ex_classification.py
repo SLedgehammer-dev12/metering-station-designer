@@ -113,7 +113,10 @@ def classify_ex(
 
 def _recommend_protection(zone: str, gas_group: str) -> list[str]:
     if zone == "Zone 0":
-        return ["Ex ia (Intrinsic Safety)", "Ex s (Special protection)", "Ex d (Flameproof)"]
+        # Ex d (flameproof) is NOT permitted in Zone 0 — an explosive atmosphere
+        # is continuously present, so only intrinsically-safe (Ex ia), Ex ma or
+        # special protection (Ex s) are allowed per IEC 60079-14.
+        return ["Ex ia (Intrinsic Safety)", "Ex s (Special protection)"]
     elif zone == "Zone 1":
         return ["Ex d (Flameproof)", "Ex ia (Intrinsic Safety)", "Ex e (Increased Safety)"]
     elif zone == "Zone 2":
@@ -168,12 +171,13 @@ def classify_zone_detailed(
             else:
                 base = "Zone 1"
 
-    # Gas detection mitigation (for open areas, reduce zone by one level)
+    # Gas detection mitigation (open areas): a detector justifies Zone 2 over
+    # Zone 1 in marginal cases, but IEC 60079-10-1 does not allow it to erase
+    # the zone entirely — a secondary release still produces a Zone 2, never a
+    # "Non-hazardous" area.
     if has_gas_detection and not is_enclosed:
         if base == "Zone 1":
             base = "Zone 2"
-        elif base == "Zone 2":
-            base = "Non-hazardous"
 
     return base
 

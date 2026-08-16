@@ -18,6 +18,25 @@ _NPS_TO_OD = {
 _OD_TO_NPS = {v: k for k, v in _NPS_TO_OD.items()}
 
 
+# ASME B31.8 §841.1.1 location-class design factors.
+_B318_LOCATION_FACTOR = {
+    "1": 0.72,   # farms, open country, no buildings
+    "2": 0.60,   # scattered buildings / metering stations
+    "3": 0.50,   # dense buildings / industrial areas
+    "4": 0.40,   # multi-story buildings, high population
+}
+
+
+def _b318_temp_derating(temp_C: float) -> float:
+    """ASME B31.8 §841.1.1 temperature derating factor T (below 250 °F → 1.0)."""
+    if temp_C < 121: return 1.000
+    if temp_C < 149: return 0.967
+    if temp_C < 177: return 0.933
+    if temp_C < 205: return 0.900
+    if temp_C < 232: return 0.867
+    return 0.833
+
+
 def load_stress_data():
     path = os.path.join(KNOWLEDGE_DIR, "asme_b313_stress.json")
     with open(path, "r", encoding="utf-8") as f:
@@ -43,6 +62,7 @@ def calc_min_wall_thickness(
     standard: str = "B31.3",
     y_factor: float = 0.4,
     mill_tolerance_pct: float = 12.5,
+    location_class: str = "2",
 ) -> dict:
     data = load_stress_data()
     mats = data.get("materials", {})
@@ -73,7 +93,14 @@ def calc_min_wall_thickness(
     if standard in ("B31.3", "B31.4"):
         tm = P_MPa * D / (2 * (S * E * W + P_MPa * Y))
     elif standard == "B31.8":
-        tm = P_MPa * D / (2 * S * E * W * 0.72)
+        # ASME B31.8 §841.1.1: t = P·D/(2·S·F·E·T) where S is the Specified
+        # Minimum Yield Strength (SMYS), F the location-class design factor and
+        # T the temperature derating factor. Using the B31.3 allowable stress
+        # here double-reduced the wall; B31.8 must use SMYS directly.
+        smys = mat.get("min_yield_MPa") or S
+        F = _B318_LOCATION_FACTOR.get(str(location_class), 0.60)
+        Tf = _b318_temp_derating(design_t_C)
+        tm = P_MPa * D / (2 * smys * E * W * F * Tf)
     else:
         tm = P_MPa * D / (2 * S)
 
@@ -89,7 +116,12 @@ def calc_min_wall_thickness(
     if design_t_C > max_temp:
         return {"error": f"Tasarım sıcaklığı {design_t_C}°C, {mat.get('name', material)} maksimum sıcaklığını ({max_temp}°C) aşıyor. Malzeme değiştirin."}
 
-    burst_p = 2 * S * t_with_mill / D * 10  # MPa·mm/mm → bar, using tolerance-adjusted thickness
+    # Burst pressure must be based on the Specified Minimum Yield Stress (SMYS),
+    # not the allowable design stress — using S≈134 MPa reported ~98 bar for an
+    # A106 GrB NPS 8 design at 50 bar, while the true burst is ≈2·SMYS·t/D.
+    smys = mat.get("min_yield_MPa")
+    burst_stress = smys if smys else S
+    burst_p = 2 * burst_stress * t_with_mill / D * 10  # MPa·mm/mm → bar
     if burst_p < design_p_bar * 2.5:
         temp_warning = (temp_warning or "") + f" Patlama basıncı {burst_p:.0f} bar, tasarımın {burst_p/design_p_bar:.1f} katı (min 2.5x önerilir)."
 

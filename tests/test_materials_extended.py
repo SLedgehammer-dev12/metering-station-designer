@@ -92,6 +92,63 @@ def test_classify_ex_zone_enclosed():
     assert result["zone"] == "Zone 1"
 
 
+# ---------------------------------------------------------------------------
+# Faz 3: SMYS burst, B31.8 design factor + temp derating, Ex d Zone-0 ban
+# ---------------------------------------------------------------------------
+
+def test_burst_pressure_uses_smys_not_allowable():
+    """Burst pressure must scale with SMYS (240 MPa for A106 GrB), not the
+    ~134 MPa allowable stress, which under-reported burst by ~2×."""
+    pipe = calc_min_wall_thickness(50, 60, 219.1, "A106_GrB")
+    assert "error" not in pipe
+    assert pipe["burst_pressure_bar"] > 160, (
+        f"A106 GrB NPS8 @50 bar burst={pipe['burst_pressure_bar']} bar, "
+        f"expected ≈2·SMYS·t/D ≈ 180+ bar (old allowable-based value ≈98)"
+    )
+
+
+def test_b31_8_location_class_design_factor():
+    """B31.8 wall grows as location class tightens (F: 0.72→0.40)."""
+    t1 = calc_min_wall_thickness(50, 60, 219.1, "A106_GrB", standard="B31.8", location_class="1")
+    t4 = calc_min_wall_thickness(50, 60, 219.1, "A106_GrB", standard="B31.8", location_class="4")
+    assert "error" not in t1 and "error" not in t4
+    assert t4["t_min_pressure_mm"] > t1["t_min_pressure_mm"]
+    # Class 2 (metering station default) is stricter than class 1.
+    t2 = calc_min_wall_thickness(50, 60, 219.1, "A106_GrB", standard="B31.8", location_class="2")
+    assert t2["t_min_pressure_mm"] > t1["t_min_pressure_mm"]
+
+
+def test_b31_8_temp_derating():
+    """B31.8 temperature derating T must thin... thicken the wall above 121 °C."""
+    from metering_designer.piping.wall_thickness import _b318_temp_derating
+    assert _b318_temp_derating(20) == 1.0
+    assert _b318_temp_derating(120) == 1.0
+    assert _b318_temp_derating(122) < 1.0
+    assert _b318_temp_derating(250) < _b318_temp_derating(150)
+    # A hotter B31.8 design requires a thicker wall (lower T factor).
+    t_cool = calc_min_wall_thickness(50, 60, 219.1, "A106_GrB", standard="B31.8")
+    t_hot = calc_min_wall_thickness(50, 200, 219.1, "A106_GrB", standard="B31.8")
+    assert "error" not in t_cool and "error" not in t_hot
+    assert t_hot["t_min_pressure_mm"] > t_cool["t_min_pressure_mm"]
+
+
+def test_zone0_no_ex_d():
+    """Ex d (flameproof) is not permitted in Zone 0 per IEC 60079-14."""
+    from metering_designer.safety.ex_classification import _recommend_protection
+    recs = _recommend_protection("Zone 0", "IIA")
+    assert all("Ex d" not in r for r in recs), f"Zone 0 must not list Ex d: {recs}"
+    assert any("Ex ia" in r for r in recs)
+    # Ex d IS still the right choice for Zone 1.
+    assert any("Ex d" in r for r in _recommend_protection("Zone 1", "IIA"))
+
+
+def test_gas_detection_never_erases_zone2():
+    """Open area + gas detection may justify Zone 2, never Non-hazardous."""
+    r = classify_ex(fluid_type="gas", is_enclosed=False,
+                    ventilation="natural", has_gas_detection=True)
+    assert r["zone"] in ("Zone 2", "Zone 1")
+
+
 def test_schedule_exceeds_max():
     s = recommend_schedule(10, 50.0)
     assert s.get("recommended") is None
@@ -194,9 +251,10 @@ def test_classify_zone_detailed():
         release_grade="secondary",
     ) == "Zone 1"
 
-    # 9. Open + high ventilation + gas detection + secondary → Non-hazardous
+    # 9. Open + high ventilation + gas detection + secondary → Zone 2
+    #    (gas detection may justify Zone 2, but never "Non-hazardous")
     assert classify_zone_detailed(
         is_enclosed=False, ventilation_type="natural",
         ventilation_rate="high", has_gas_detection=True,
         release_grade="secondary",
-    ) == "Non-hazardous"
+    ) == "Zone 2"

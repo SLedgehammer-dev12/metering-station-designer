@@ -1,6 +1,10 @@
 """
 API RP 14E — Erosional velocity limit check for piping.
-v_e = C / sqrt(rho_kg_m3) where C = 100 (continuous) or 125 (intermittent).
+v_e = C / sqrt(rho_kg_m3) with SI-unit constants:
+    C = 122  (continuous service)
+    C = 152.5 (intermittent service)
+(US-unit constants 100/125 apply when density is in lb/ft³; with SI density in
+kg/m³ the standard recommends 122/152.5.)
 """
 
 import math
@@ -14,7 +18,7 @@ def check_erosional_velocity(
     if rho_kg_m3 <= 0:
         return {"error": "Density must be > 0"}
 
-    C = 100 if service_type == "continuous" else 125
+    C = 122 if service_type == "continuous" else 152.5
     v_erosional = C / math.sqrt(rho_kg_m3)
 
     ok = velocity_m_s <= v_erosional

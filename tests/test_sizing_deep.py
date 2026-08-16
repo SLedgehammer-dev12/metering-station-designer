@@ -239,13 +239,13 @@ def test_coriolis_edge_cases():
 
 
 def test_erosional_intermittent():
-    """Erosional velocity: intermittent service C=125 gives higher threshold than continuous C=100."""
+    """Erosional velocity: intermittent service C=152.5 gives higher threshold than continuous C=122 (SI units)."""
     e_int = check_erosional_velocity(10, 50, service_type="intermittent")
     assert e_int["v_erosional_m_s"] > 0
     assert isinstance(e_int["ok"], bool)
-    assert e_int["C_factor"] == 125
+    assert e_int["C_factor"] == 152.5
 
     # Compare with continuous: intermittent should have higher threshold
     e_cont = check_erosional_velocity(10, 50, service_type="continuous")
-    assert e_cont["C_factor"] == 100
+    assert e_cont["C_factor"] == 122
     assert e_int["v_erosional_m_s"] > e_cont["v_erosional_m_s"]
