@@ -10,13 +10,19 @@ class ValidationError(Exception):
     pass
 
 
-def validate_project_inputs(project: dict) -> list[str]:
+def validate_project_inputs(project: dict) -> tuple[list[str], list[str]]:
+    """Validate project metadata.
+
+    Returns ``(errors, warnings)``. Missing name blocks the project (error);
+    a missing location is only a suggestion (warning), not a blocker.
+    """
     errors = []
+    warnings = []
     if not project.get("name"):
         errors.append("Proje adı zorunludur.")
     if not project.get("location"):
-        errors.append("Konum/saha bilgisi önerilir.")
-    return errors
+        warnings.append("Konum/saha bilgisi önerilir.")
+    return errors, warnings
 
 
 def validate_process_inputs(proc: dict) -> list[str]:
@@ -114,15 +120,18 @@ def validate_all(
     project: Optional[dict] = None,
     process: Optional[dict] = None,
     requirements: Optional[dict] = None,
-) -> list[str]:
+) -> tuple[list[str], list[str]]:
     errors = []
+    warnings = []
     if project:
-        errors.extend(validate_project_inputs(project))
+        e, w = validate_project_inputs(project)
+        errors.extend(e)
+        warnings.extend(w)
     if process:
         errors.extend(validate_process_inputs(process))
     if requirements:
         errors.extend(validate_requirements(requirements))
-    return errors
+    return errors, warnings
 
 
 def check_composition_sanity(composition: dict) -> list[str]:

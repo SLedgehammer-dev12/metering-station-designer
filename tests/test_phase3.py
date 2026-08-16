@@ -195,22 +195,35 @@ def test_composition_sanity_normal():
 
 def test_validate_project_inputs_missing_name():
     """Missing project name must return an error."""
-    errors = validate_project_inputs({"location": "Test Site"})
+    errors, warnings = validate_project_inputs({"location": "Test Site"})
     assert len(errors) >= 1, "should error on missing project name"
     assert any("zorunludur" in e.lower() or "required" in e.lower() for e in errors)
 
 
 def test_validate_project_inputs_valid():
     """Valid project input must pass with no errors."""
-    errors = validate_project_inputs({"name": "Test Project", "location": "Site A"})
+    errors, warnings = validate_project_inputs({"name": "Test Project", "location": "Site A"})
     assert len(errors) == 0, f"expected no errors, got: {errors}"
 
 
 def test_validate_project_inputs_missing_location():
-    """Missing location should generate a warning."""
-    errors = validate_project_inputs({"name": "Test Project"})
-    assert len(errors) >= 1, "should warn about missing location"
-    assert any("önerilir" in e.lower() or "location" in e.lower() for e in errors)
+    """Missing location must be a warning, not a blocking error."""
+    errors, warnings = validate_project_inputs({"name": "Test Project"})
+    assert len(errors) == 0, f"missing location must not block: {errors}"
+    assert len(warnings) >= 1, "should warn about missing location"
+    assert any("önerilir" in w.lower() or "location" in w.lower() for w in warnings)
+
+
+def test_validate_all_returns_tuple():
+    """validate_all must return (errors, warnings) with the location warning."""
+    from metering_designer.core.validation import validate_all
+    errors, warnings = validate_all(
+        project={"name": "X"},
+        process={"fluid_type": "gas", "nps": 8, "design_p_bar": 50,
+                 "oper_p_bar": 40, "design_t_c": 60, "qmin": 1000, "qmax": 10000},
+    )
+    assert len(errors) == 0, f"valid inputs must not error: {errors}"
+    assert any("Konum" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------

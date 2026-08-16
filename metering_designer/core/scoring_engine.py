@@ -158,8 +158,6 @@ class MeterScorer:
                     return 10.0, "Gaz ölçümü için uygun tasarlanmış"
                 if not is_gas and "liquid" in meter_data.get("fluids", []):
                     return 10.0, "Sıvı ölçümü için uygun tasarlanmış"
-                if not is_gas and is_gas:
-                    return 5.0, "Alternatif uygulama, orta derece uygun"
                 return 0.0, "Bu akışkan tipi için uygun değil"
 
             if crit_key == "turndown_coverage":
@@ -348,11 +346,16 @@ class MeterScorer:
         upstream = meter_data.get("min_straight_upstream", 10)
         downstream = meter_data.get("min_straight_downstream", 5)
 
+        # Estimated differential pressure for the justification card. A real Δp
+        # needs fluid density, which the scoring stage does not carry; instead
+        # use the physical Δp ∝ q² scaling of an orifice, calibrated to ≈250
+        # mbar at a typical custody-transfer Qmax (30 000 Sm³/h). Non-orifice
+        # meters (USM/turbine/coriolis) impose a much smaller Δp.
         if qmax > 0 and "orifice" in meter_key:
-            beta = 0.55
-            dp_pa = beta ** 2 * qmax * 10
+            k_dp = 25000 / (30000.0 ** 2)  # Pa per (Sm³/h)²
+            dp_pa = k_dp * qmax ** 2
         else:
-            dp_pa = 0.05 * qmax
+            dp_pa = 0.05 * qmax  # ~15 mbar at 30 000 Sm³/h for low-loss meters
 
         return {
             "straight_pipe_upstream_diameters": upstream,

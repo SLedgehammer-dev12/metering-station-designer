@@ -112,6 +112,25 @@ def test_auxiliary_details():
     assert isinstance(result.details["estimated_dp_bar"], (int, float))
 
 
+def test_orifice_dp_estimate_scales_with_q2():
+    """Orifice Δp estimate must scale with the square of flow (physical)."""
+    scorer = MeterScorer()
+    base = {
+        "fluid_type": "gas", "nps": 10, "design_p_bar": 50, "design_t_c": 50,
+        "qmin": 5000, "service_type": "custody_transfer",
+        "target_uncertainty": 0.5,
+    }
+    r1 = scorer.score_meter("orifice", {**base, "qmax": 20000})
+    r2 = scorer.score_meter("orifice", {**base, "qmax": 40000})
+    dp1 = r1.details["estimated_dp_bar"]
+    dp2 = r2.details["estimated_dp_bar"]
+    # 2× flow → 4× Δp
+    assert dp2 == pytest.approx(4 * dp1, rel=0.01)
+    # Reference calibration: 30 000 Sm³/h ≈ 250 mbar
+    r_ref = scorer.score_meter("orifice", {**base, "qmax": 30000})
+    assert r_ref.details["estimated_dp_bar"] == pytest.approx(0.25, rel=0.01)
+
+
 def test_error_path_ERR_label():
     from metering_designer.core import scoring_engine as se_mod
     original_score_meter = se_mod.MeterScorer.score_meter
