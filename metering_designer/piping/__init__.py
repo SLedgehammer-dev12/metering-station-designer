@@ -96,3 +96,15 @@ def find_schedule_for_thickness(nps: int, t_required_mm: float) -> str | None:
 def get_od_mm_for_nps(nps: int) -> float:
     """Alias for nps_to_od_mm."""
     return nps_to_od_mm(nps)
+
+
+def pipe_id_mm(nps: int, schedule: str = "40") -> float:
+    """ASME B36.10M internal diameter (mm) for NPS + schedule.
+
+    ID = OD − 2·wall. Falls back to the historical 0.88·OD approximation only
+    when schedule data is unavailable for the requested NPS.
+    """
+    wall = get_schedule_wall_mm(nps, schedule)
+    if wall > 0:
+        return nps_to_od_mm(nps) - 2 * wall
+    return nps_to_od_mm(nps) * 0.88

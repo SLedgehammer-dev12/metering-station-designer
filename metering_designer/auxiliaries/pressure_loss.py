@@ -18,8 +18,10 @@ def estimate_permanent_pressure_loss(
 ) -> dict:
     if "orifice" in meter_key:
         dp_mbar, formula = _orifice_pressure_loss(beta_ratio, dp_orifice_mbar)
-    elif "venturi" in meter_key or "v_cone" in meter_key or "vcone" in meter_key:
-        dp_mbar, formula = _orifice_pressure_loss(beta_ratio, dp_orifice_mbar)
+    elif "venturi" in meter_key:
+        dp_mbar, formula = _venturi_pressure_loss(beta_ratio, dp_orifice_mbar)
+    elif "v_cone" in meter_key or "vcone" in meter_key:
+        dp_mbar, formula = _vcone_pressure_loss(beta_ratio, dp_orifice_mbar)
     elif "ultrasonic" in meter_key:
         dp_mbar = 0.5 * (velocity_m_s ** 2) * rho_kg_m3 / 100
         formula = "USM: negligible loss, ~dynamic pressure fraction"
@@ -70,6 +72,32 @@ def _orifice_pressure_loss(beta: float, dp_orifice_mbar: float = None) -> tuple:
     formula = (
         f"ISO 5167-2 permanent loss: Δω/Δp={loss_fraction:.3f}, "
         f"β={beta:.3f}, Δp_orifice={dp_orifice_mbar:.0f} mbar"
+    )
+    return dp_perm_mbar, formula
+
+
+def _venturi_pressure_loss(beta: float, dp_orifice_mbar: float = None) -> tuple:
+    """Classical Venturi (ISO 5167-4): permanent loss ≈ 10–17% of Δp."""
+    if dp_orifice_mbar is None:
+        dp_orifice_mbar = 250.0
+    loss_fraction = 0.15
+    dp_perm_mbar = loss_fraction * dp_orifice_mbar
+    formula = (
+        f"ISO 5167-4 classical Venturi: Δω/Δp≈{loss_fraction:.2f} "
+        f"(β={beta:.3f}, Δp={dp_orifice_mbar:.0f} mbar)"
+    )
+    return dp_perm_mbar, formula
+
+
+def _vcone_pressure_loss(beta: float, dp_orifice_mbar: float = None) -> tuple:
+    """V-Cone (ISO 5167-5 / ASME MFC-7M): loss fraction ≈ (1−β²)·0.3."""
+    if dp_orifice_mbar is None:
+        dp_orifice_mbar = 250.0
+    loss_fraction = (1 - beta ** 2) * 0.3
+    dp_perm_mbar = loss_fraction * dp_orifice_mbar
+    formula = (
+        f"V-Cone permanent loss: Δω/Δp={(1 - beta ** 2) * 0.3:.3f}, "
+        f"β={beta:.3f}, Δp={dp_orifice_mbar:.0f} mbar"
     )
     return dp_perm_mbar, formula
 

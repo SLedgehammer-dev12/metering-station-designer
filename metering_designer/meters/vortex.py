@@ -17,8 +17,8 @@ def size_vortex(
     rho_std_kg_m3: float,
     is_gas: bool = True,
 ) -> dict:
-    od_mm = _nps_to_od(nps)
-    id_mm = od_mm * 0.87
+    from metering_designer.piping import pipe_id_mm
+    id_mm = pipe_id_mm(nps)
     id_m = id_mm / 1000
     A = math.pi * (id_m / 2) ** 2
 
@@ -48,8 +48,9 @@ def size_vortex(
 
     f_ok = f_min_hz >= 1.0 if not is_gas else f_min_hz >= 0.5
 
-    # K-factor
-    K_pulses_per_m3 = St / (math.pi * (bluff_body_width / 1000) ** 2 / 4) * (A / (bluff_body_width * 0.26 / 1000))
+    # K-factor: empirical per-NPS table (from manufacturer calibration ranges).
+    # The geometric Strouhal estimate was dimensionally inconsistent and is
+    # superseded by the calibrated values.
     K_pulses_per_m3 = _estimate_vortex_k_factor(nps)
 
     # Pressure loss

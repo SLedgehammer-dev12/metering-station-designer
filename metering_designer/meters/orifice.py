@@ -9,7 +9,7 @@ from metering_designer.core.result import Result
 TAP_TYPES = {
     "corner": {"description": "Corner taps (ISO 5167-2 §6.1.2)", "L1": 0.0, "L2": 0.0},
     "flange": {"description": "Flange taps (ISO 5167-2 §6.1.3)", "L1": None, "L2": None},  # L = 25.4/D_mm
-    "D_D": {"description": "D-D/2 taps (ISO 5167-2 §6.1.4)", "L1": 0.5, "L2": 0.47},
+    "D_D": {"description": "D-D/2 taps (ISO 5167-2 §6.1.4)", "L1": 1.0, "L2": 0.47},
     "2D": {"description": "2D and 2D taps", "L1": 2.0, "L2": 2.0},
 }
 
@@ -64,6 +64,7 @@ def calc_beta_ratio(
     rho_kg_m3: float,
     mu_Pa_s: float,
     dp_target_Pa: float = 25000,
+    p1_Pa: float = None,
     tap_type: str = "corner",
     standard: str | None = None,
 ) -> dict:
@@ -77,9 +78,14 @@ def calc_beta_ratio(
         rho_kg_m3: fluid density [kg/m³]
         mu_Pa_s: dynamic viscosity [Pa·s]
         dp_target_Pa: target differential pressure [Pa] (default 250 mbar)
+        p1_Pa: upstream pressure [Pa ABSOLUTE]. Required — the expansibility
+            factor ε depends on p1, and hardcoding a nominal 45 bar produced
+            wrong results at low pressure (ε→1 at 5 bar vs 0.984 at 45 bar).
         tap_type: tap type; when None the selected standard's default is used
         standard: design standard id ('iso5167_2' or 'aga3')
     """
+    if p1_Pa is None:
+        raise ValueError("p1_Pa (upstream absolute pressure in Pa) is required")
     if tap_type is not None and tap_type not in TAP_TYPES:
         raise ValueError(
             f"Unknown tap_type '{tap_type}'. Available options: {', '.join(TAP_TYPES.keys())}"
@@ -97,7 +103,7 @@ def calc_beta_ratio(
     # ΔP ∝ qm² / (β² * ...)
     beta = 0.6
     for i in range(30):
-        eps = _expansibility_factor(beta, dp_target_Pa, 4.5e6)
+        eps = _expansibility_factor(beta, dp_target_Pa, p1_Pa)
         Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
         d_mm = beta * D_mm
         d_m = d_mm / 1000
@@ -131,7 +137,7 @@ def calc_beta_ratio(
     beta = max(beta_limit_lo, min(beta, beta_limit_hi))
     d_mm = beta * D_mm
     Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
-    eps = _expansibility_factor(beta, dp_target_Pa, 4.5e6)
+    eps = _expansibility_factor(beta, dp_target_Pa, p1_Pa)
     d_m = d_mm / 1000
     A_throat = math.pi * (d_m / 2) ** 2
 
@@ -149,6 +155,7 @@ def calc_beta_ratio(
         "Cd": round(Cd, 5),
         "Cd_formula": std["cd_formula"],
         "expansibility_eps": round(eps, 5),
+        "p1_Pa_abs": round(p1_Pa, 0),
         "Re": round(Re, 0),
         "dp_orifice_Pa": round(dp_target_Pa, 0),
         "dp_orifice_mbar": round(dp_target_Pa / 100, 1),
@@ -292,6 +299,9 @@ def size_orifice_for_flow(
 
     design the plate for a user-selectable differential pressure at maximum
     flow and a user-selectable design standard.
+
+    P_oper_bar must be the ABSOLUTE upstream operating pressure (bar); it is
+    converted to Pa and used as p1 for the expansibility factor ε.
     """
     std = _standard_profile(tap_type, standard)
     resolved_tap = std["tap_type"]
@@ -300,7 +310,9 @@ def size_orifice_for_flow(
     qm_max = q_max_Sm3h * rho_std_kg_m3 / 3600
     qm_min = q_min_Sm3h * rho_std_kg_m3 / 3600
 
+    p1_Pa = P_oper_bar * 1e5
     result = calc_beta_ratio(qm_max, D_mm, rho_kg_m3, mu_Pa_s, dp_max_Pa,
+                             p1_Pa=p1_Pa,
                              tap_type=resolved_tap, standard=std["standard"])
 
     D_m = D_mm / 1000
@@ -326,6 +338,7 @@ def calc_beta_ratio_with_fluid(
     D_mm: float,
     fluid: "Fluid",
     dp_target_Pa: float = 25000,
+    p1_Pa: float = 4.5e6,
     tap_type: str = "corner",
 ) -> dict:
     """Wrapper around calc_beta_ratio that extracts fluid props from Fluid object.
@@ -335,6 +348,7 @@ def calc_beta_ratio_with_fluid(
         D_mm: pipe internal diameter [mm]
         fluid: Fluid dataclass instance with rho_oper_kg_m3, mu_dynamic_Pa_s
         dp_target_Pa: target differential pressure [Pa]
+        p1_Pa: upstream absolute pressure [Pa] (Fluid carries no pressure field)
         tap_type: tap type ("corner", "flange", "D_D", "2D")
     """
     from metering_designer.fluids.fluid import Fluid
@@ -342,7 +356,8 @@ def calc_beta_ratio_with_fluid(
     rho = fluid.rho_oper_kg_m3 if hasattr(fluid, "rho_oper_kg_m3") else 0
     mu = fluid.mu_dynamic_Pa_s if hasattr(fluid, "mu_dynamic_Pa_s") else 1e-5
 
-    return calc_beta_ratio(qm_kg_s, D_mm, rho, mu, dp_target_Pa, tap_type=tap_type)
+    return calc_beta_ratio(qm_kg_s, D_mm, rho, mu, dp_target_Pa, p1_Pa=p1_Pa,
+                           tap_type=tap_type)
 
 
 def size_orifice_for_flow_with_fluid(
@@ -384,6 +399,7 @@ def calc_beta_ratio_result(
     rho_kg_m3: float,
     mu_Pa_s: float,
     dp_target_Pa: float = 25000,
+    p1_Pa: float = 4.5e6,
     tap_type: str = "corner",
     standard: str | None = None,
 ) -> Result:
@@ -391,11 +407,13 @@ def calc_beta_ratio_result(
     result = Result()
     try:
         data = calc_beta_ratio(qm_kg_s, D_mm, rho_kg_m3, mu_Pa_s, dp_target_Pa,
+                               p1_Pa=p1_Pa,
                                tap_type=tap_type, standard=standard)
         result.data = data
         result.add_provenance(
             function_name="calc_beta_ratio",
             parameters={"tap_type": tap_type, "dp_target_Pa": dp_target_Pa,
+                        "p1_Pa": p1_Pa,
                         "standard": data.get("standard", "iso5167_2")},
             standard_ref=data.get("standard_ref", "ISO 5167-2:2022"),
         )

@@ -17,8 +17,8 @@ def size_v_cone(
     rho_std_kg_m3: float,
     is_gas: bool = True,
 ) -> dict:
-    od_mm = _nps_to_od(nps)
-    id_mm = od_mm * 0.88
+    from metering_designer.piping import pipe_id_mm
+    id_mm = pipe_id_mm(nps)
     id_m = id_mm / 1000
     A_pipe = math.pi * (id_m / 2) ** 2
 
@@ -33,14 +33,16 @@ def size_v_cone(
     # Beta ratio: V-Cone typically 0.45-0.85
     beta = _estimate_vcone_beta(q_act_max, id_mm, rho_kg_m3)
     beta = max(0.45, min(beta, 0.85))
-    d_vc_mm = beta * id_mm
 
     # Discharge coefficient for V-Cone
     Cd = _vcone_cd(beta, Re)
     eps = _vcone_expansibility(beta, P_oper_bar) if is_gas else 1.0
 
-    # Differential pressure
-    At = math.pi * (d_vc_mm / 2000) ** 2
+    # Annular flow area between cone and pipe wall = A_pipe·β².
+    # The cone body diameter that produces this annulus is D·√(1−β²); reporting
+    # β·D (an "equivalent diameter") has no physical meaning.
+    At = A_pipe * beta ** 2
+    d_cone_mm = id_mm * math.sqrt(1 - beta ** 2)
     E = 1.0 / math.sqrt(1 - beta ** 4)
     dp_Pa = (q_act_max * rho_kg_m3) ** 2 / (2 * rho_kg_m3 * (Cd * eps * E * At) ** 2) if At > 0 else 25000
     dp_mbar = dp_Pa / 100
@@ -59,7 +61,7 @@ def size_v_cone(
     return {
         "meter_type": "V-Cone",
         "nps": nps, "id_mm": round(id_mm, 1),
-        "beta": round(beta, 4), "d_cone_mm": round(d_vc_mm, 2),
+        "beta": round(beta, 4), "d_cone_mm": round(d_cone_mm, 2),
         "Cd": round(Cd, 5), "eps": round(eps, 5),
         "Re": round(Re, 0), "Re_ok": Re > 8000,
         "v_pipe_ms": round(v_pipe, 2),
@@ -114,24 +116,39 @@ def size_venturi(
     mu_Pa_s: float,
     rho_std_kg_m3: float,
 ) -> dict:
-    od_mm = _nps_to_od(nps)
-    id_mm = od_mm * 0.88
+    """ISO 5167-4 classical Venturi (machined convergent section) sizing.
+
+    - Cd = 0.995 for 0.3 ≤ β ≤ 0.75, 2·10^5 ≤ Re ≤ 10^6 (uncalibrated).
+    - Expansibility ε per ISO 5167-1 §5.3.2.2 with the real p1 (absolute).
+    - β is sized to a typical design Δp ≈ 250 mbar at maximum flow.
+    - Permanent loss of a classical Venturi is only ~10–17% of Δp.
+    """
+    from metering_designer.piping import pipe_id_mm
+
+    id_mm = pipe_id_mm(nps)
     id_m = id_mm / 1000
     A_pipe = math.pi * (id_m / 2) ** 2
-    q_act_max = q_max_Sm3h * rho_std_kg_m3 / rho_kg_m3 / 3600 if rho_kg_m3 > 0 else 0
+    qm_max = q_max_Sm3h * rho_std_kg_m3 / 3600 if rho_std_kg_m3 > 0 else 0
+    q_act_max = qm_max / rho_kg_m3 if rho_kg_m3 > 0 else 0
     v_pipe = q_act_max / A_pipe if A_pipe > 0 else 0
     Re = rho_kg_m3 * v_pipe * id_m / mu_Pa_s if mu_Pa_s > 0 else 1e6
 
-    # Venturi: machined convergent section, fixed beta = 0.5 typical
-    beta = 0.5
-    d_throat_mm = beta * id_mm
-    Cd = 0.995  # Venturi Cd ≈ 0.995
-    eps = 1 - (0.41 + 0.35 * beta ** 4) * 0.3 / 1.3  # simplified
+    Cd = 0.995
+    kappa = 1.3  # isentropic exponent for natural gas
+    p1_Pa = P_oper_bar * 1e5
+    dp_target_Pa = 25000  # typical design Δp for a venturi, 250 mbar
 
-    At = math.pi * (d_throat_mm / 2000) ** 2
-    dp_Pa = 25000
+    beta = _size_venturi_beta(qm_max, id_mm, rho_kg_m3, Cd, p1_Pa, dp_target_Pa, kappa)
+    beta = max(0.3, min(beta, 0.75))
+    d_throat_mm = beta * id_mm
+    At = A_pipe * beta ** 2
+    E = 1.0 / math.sqrt(1 - beta ** 4)
+    eps = _venturi_expansibility(beta, dp_target_Pa, p1_Pa, kappa)
+
+    dp_Pa = (qm_max / (Cd * eps * E * At)) ** 2 / (2 * rho_kg_m3) if At > 0 and rho_kg_m3 > 0 else dp_target_Pa
     dp_mbar = dp_Pa / 100
-    dp_perm_mbar = dp_mbar * (1 - beta ** 2) * 0.15  # Venturi: very low perm loss
+    # Classical venturi permanent loss ≈ 10–17% of Δp (ISO 5167-4).
+    dp_perm_mbar = dp_mbar * 0.15
 
     td = q_max_Sm3h / q_min_Sm3h if q_min_Sm3h > 0 else 1
     unc = 0.7
@@ -139,7 +156,7 @@ def size_venturi(
     return {
         "meter_type": "Venturi (klasik)",
         "nps": nps, "id_mm": round(id_mm, 1),
-        "beta": beta, "d_throat_mm": round(d_throat_mm, 1),
+        "beta": round(beta, 4), "d_throat_mm": round(d_throat_mm, 1),
         "Cd": Cd, "eps": round(eps, 5),
         "Re": round(Re, 0), "Re_ok": Re > 2e5,
         "v_pipe_ms": round(v_pipe, 2),
@@ -148,7 +165,7 @@ def size_venturi(
         "turndown_actual": round(td, 1), "turndown_max": 8,
         "turndown_ok": td <= 8, "base_uncertainty_pct": unc,
         "straight_upstream_D": 8, "straight_downstream_D": 5,
-        "notes": "Cd=0.995 sabit, β=0.5. ISO 5167-4 machined convergent.",
+        "notes": "ISO 5167-4 machined convergent, Cd=0.995, 0.3≤β≤0.75, Re≥2·10^5.",
     }
 
 
@@ -197,6 +214,48 @@ def _vcone_expansibility(beta: float, P_bar: float) -> float:
     if P_bar <= 0:
         return 1.0
     return 1 - (0.41 + 0.35 * beta ** 4) * 0.3 / (1.3 * P_bar)
+
+
+def _size_venturi_beta(qm_kg_s: float, id_mm: float, rho: float,
+                       Cd: float, p1_Pa: float, dp_target_Pa: float,
+                       kappa: float = 1.3) -> float:
+    """Iteratively size the Venturi β to reach dp_target at qm_max."""
+    if qm_kg_s <= 0 or id_mm <= 0 or rho <= 0:
+        return 0.5
+    D_m = id_mm / 1000
+    A_pipe = math.pi * (D_m / 2) ** 2
+    beta = 0.5
+    for _ in range(30):
+        At = A_pipe * beta ** 2
+        eps = _venturi_expansibility(beta, dp_target_Pa, p1_Pa, kappa)
+        qm_calc = Cd * eps * At * math.sqrt(2 * rho * dp_target_Pa) / math.sqrt(1 - beta ** 4)
+        if qm_calc <= 0:
+            break
+        factor = qm_kg_s / qm_calc
+        beta_new = beta * factor ** 0.25
+        if abs(beta_new - beta) < 1e-5:
+            beta = beta_new
+            break
+        beta = beta_new
+    return beta
+
+
+def _venturi_expansibility(beta: float, dp_Pa: float, p1_Pa: float,
+                           kappa: float = 1.3) -> float:
+    """Expansibility factor for a Venturi per ISO 5167-1 §5.3.2.2."""
+    if p1_Pa <= 0:
+        return 1.0
+    tau = 1 - dp_Pa / p1_Pa
+    if tau <= 0:
+        return 1.0
+    k = kappa
+    b4 = beta ** 4
+    t2k = tau ** (2 / k)
+    return math.sqrt(
+        (k * t2k / (k - 1))
+        * ((1 - b4) / (1 - b4 * t2k))
+        * ((1 - tau ** ((k - 1) / k)) / (1 - tau))
+    )
 
 
 def _vcone_notes(beta: float, td_ok: bool, Re: float) -> str:

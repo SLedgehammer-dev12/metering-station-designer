@@ -1,6 +1,7 @@
 """Deep meter sizing tests (Agent: test-sizing)."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import pytest
 from metering_designer.meters.orifice import size_orifice_for_flow
 from metering_designer.meters.ultrasonic import size_ultrasonic
 from metering_designer.meters.turbine import size_turbine
@@ -64,6 +65,17 @@ def test_vcone_beta_bounds():
     assert 0.45 <= vc["beta"] <= 0.85
 
 
+def test_vcone_cone_diameter_is_physical():
+    """Reported cone diameter must be D·√(1−β²), not the β·D 'equivalent'."""
+    vc = size_v_cone(8, 50000, 5000, 45, 40, 35, 1.5e-6, 0.75)
+    id_mm = vc["id_mm"]
+    beta = vc["beta"]
+    expected = id_mm * (1 - beta ** 2) ** 0.5
+    assert vc["d_cone_mm"] == pytest.approx(expected, rel=0.001)
+    # And the annulus area A_pipe·β² is used for Δp, so β·D would be smaller.
+    assert vc["d_cone_mm"] < id_mm
+
+
 def test_erosional_velocity_check():
     e = check_erosional_velocity(10, 50)
     assert e["v_erosional_m_s"] > 0
@@ -99,6 +111,35 @@ def test_venturi_cd_near_0995():
     assert 0.98 <= v["Cd"] <= 1.0
     # Cd should be very close to 0.995
     assert abs(v["Cd"] - 0.995) < 0.02
+
+
+def test_venturi_eps_iso5167_formula():
+    """Venturi expansibility uses the ISO 5167-1 ε formula with real p1."""
+    v = size_venturi(
+        nps=8, q_max_Sm3h=50000, q_min_Sm3h=5000,
+        P_oper_bar=35, T_oper_C=40,
+        rho_kg_m3=25, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    # At 35 bar (35e5 Pa) with Δp ≈ 250 mbar, ε ≈ 0.997–1.0
+    assert 0.990 < v["eps"] <= 1.0
+    # Low-pressure venturi must show a measurably lower ε
+    v_low = size_venturi(
+        nps=8, q_max_Sm3h=50000, q_min_Sm3h=5000,
+        P_oper_bar=2.5, T_oper_C=40,
+        rho_kg_m3=5, mu_Pa_s=1.5e-6, rho_std_kg_m3=0.75,
+    )
+    assert v_low["eps"] < v["eps"]
+
+
+def test_venturi_dp_scales_with_flow():
+    """Venturi is sized to ~250 mbar at Qmax; higher flow ⇒ bigger β, same Δp."""
+    small = size_venturi(8, 20000, 2000, 35, 40, 25, 1.5e-6, 0.75)
+    big = size_venturi(8, 60000, 6000, 35, 40, 25, 1.5e-6, 0.75)
+    # Fixed design Δp means the throat (β) must grow with flow.
+    assert big["beta"] > small["beta"]
+    for v in (small, big):
+        assert v["dp_mbar"] == pytest.approx(250.0, rel=0.15)
+        assert v["dp_perm_mbar"] == pytest.approx(v["dp_mbar"] * 0.15, rel=0.01)
 
 
 def test_venturi_edge_cases():

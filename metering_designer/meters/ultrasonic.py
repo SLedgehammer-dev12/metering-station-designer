@@ -36,7 +36,8 @@ def size_ultrasonic(
     std = _standard_profile(standard)
     v_lo, v_hi = std["velocity_range"]
     od_mm = _nps_to_od(nps)
-    id_mm = od_mm * 0.88
+    from metering_designer.piping import pipe_id_mm
+    id_mm = pipe_id_mm(nps)
     id_m = id_mm / 1000
     A = math.pi * (id_m / 2) ** 2
 

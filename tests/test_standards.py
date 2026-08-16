@@ -56,32 +56,32 @@ def test_get_standard_and_fallback():
 # --------------------------------------------------------------- orifice sizing
 
 def test_orifice_standard_fields_present():
-    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000)
+    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, p1_Pa=45e5)
     assert res["standard"] == "iso5167_2"
     assert res["standard_ref"] == "ISO 5167-2:2022"
     assert res["tap_type"] == "corner"
 
 
 def test_orifice_aga_defaults_to_flange_taps():
-    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, tap_type=None, standard="aga3")
+    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, p1_Pa=45e5, tap_type=None, standard="aga3")
     assert res["standard"] == "aga3"
     assert res["tap_type"] == "flange"
     assert "AGA Report No.3" in res["standard_name"]
 
 
 def test_orifice_explicit_tap_overrides_standard_default():
-    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, tap_type="D_D", standard="aga3")
+    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, p1_Pa=45e5, tap_type="D_D", standard="aga3")
     assert res["tap_type"] == "D_D"
 
 
 def test_orifice_invalid_keyword_standard_falls_back():
-    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, standard="garbage")
+    res = calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, p1_Pa=45e5, standard="garbage")
     assert res["standard"] == "iso5167_2"
 
 
 def test_orifice_invalid_explicit_tap_raises():
     with pytest.raises(ValueError):
-        calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, tap_type="nonsense")
+        calc_beta_ratio(10.0, 100.0, 50.0, 1.2e-5, 25000, p1_Pa=45e5, tap_type="nonsense")
 
 
 def test_dp_design_mbar_drives_beta_monotonically():

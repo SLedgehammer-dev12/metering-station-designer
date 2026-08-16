@@ -105,7 +105,8 @@ if "orifice" in meter_key:
                                 value=_dp_default, step=50, help=t("engineering_dp_design_help"),
                                 key="dp_design_mbar_input")
     proc["dp_design_mbar"] = int(dp_design)
-    meter_details = size_orifice_for_flow(qmax, qmin, od_mm * 0.88, oper_p_abs, oper_t, rho_oper, mu, Z_oper, rho_std,
+    from metering_designer.piping import pipe_id_mm
+    meter_details = size_orifice_for_flow(qmax, qmin, pipe_id_mm(nps), oper_p_abs, oper_t, rho_oper, mu, Z_oper, rho_std,
                                           tap_type=None, standard=_std_choice if _std_options else None,
                                           dp_design_mbar=int(dp_design))
     col_a, col_b, col_c = st.columns(3)

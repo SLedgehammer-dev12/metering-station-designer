@@ -56,6 +56,26 @@ def test_ultrasonic_mapping():
     assert r["upstream_required_diameters"] == 10
 
 
-def test_coriolis_maps_to_orifice_defaults():
+def test_coriolis_has_no_straight_run_requirement():
+    """Coriolis meters are not velocity-profile sensitive; they must not fall
+    back to the orifice 18D requirement."""
     r = calc_straight_pipe("coriolis_e_mass", 8, "single_bend_90")
-    assert r["meter_type"] == "orifice"
+    assert r["meter_type"] == "coriolis"
+    assert r["upstream_required_diameters"] == 2
+
+
+def test_vcone_short_straight_run():
+    r = calc_straight_pipe("v_cone", 8, "single_bend_90")
+    assert r["meter_type"] == "vcone"
+    assert r["upstream_required_diameters"] == 3
+    assert r["downstream_required_diameters"] == 2
+
+
+def test_venturi_maps_to_own_entry():
+    r = calc_straight_pipe("venturi", 8, "single_bend_90")
+    assert r["meter_type"] == "venturi"
+
+
+def test_vortex_maps_to_own_entry():
+    r = calc_straight_pipe("vortex", 8, "single_bend_90")
+    assert r["meter_type"] == "vortex"
