@@ -38,14 +38,14 @@ pyinstaller --onedir --windowed --name MeteringStationDesigner ^
   --add-data "knowledge;knowledge" ^
   --add-data "VERSION;." ^
   --add-data "streamlit_app;streamlit_app" ^
+  --add-data "metering_designer;metering_designer" ^
   --collect-all streamlit ^
   --hidden-import=plotly ^
   --hidden-import=numpy --hidden-import=pandas ^
   --hidden-import=pyaga8 --hidden-import=CoolProp ^
   --hidden-import=fluids --hidden-import=thermo ^
   --hidden-import=openpyxl --hidden-import=reportlab ^
-  --hidden-import=metering_designer ^
-  streamlit_app/app.py
+  launcher.py
 
 if errorlevel 1 (
     echo.

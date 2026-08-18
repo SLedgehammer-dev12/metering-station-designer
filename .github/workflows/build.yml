@@ -34,12 +34,7 @@ jobs:
       - name: Build with PyInstaller
         shell: cmd
         run: |
-          pyinstaller --onedir --console --name MeteringStationDesigner --add-data "knowledge;knowledge" --add-data "VERSION;." --add-data "streamlit_app;streamlit_app" --collect-all streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab streamlit_app/app.py
-
-      - name: Verify and Zip
-        run: |
-          dir dist\MeteringStationDesigner\
-          7z a MeteringStationDesigner_Windows.zip .\dist\MeteringStationDesigner\*
+          pyinstaller --onedir --console --name MeteringStationDesigner --add-data "knowledge;knowledge" --add-data "VERSION;." --add-data "streamlit_app;streamlit_app" --add-data "metering_designer;metering_designer" --collect-all streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab --hidden-import=numpy --hidden-import=pandas --hidden-import=matplotlib launcher.py
 
       - name: Verify bundle contents (pages + streamlit metadata)
         shell: bash
@@ -47,6 +42,41 @@ jobs:
           find dist/MeteringStationDesigner -type d -name "streamlit-*.dist-info" | grep -q . || { echo "streamlit dist-info NOT bundled"; exit 1; }
           find dist/MeteringStationDesigner -type d -path "*streamlit_app/pages" | grep -q . || { echo "streamlit_app/pages NOT bundled"; exit 1; }
           echo "bundle contents OK"
+
+      - name: Self-test (every page must execute)
+        shell: bash
+        env:
+          MSD_SELFTEST: "1"
+        run: |
+          ./dist/MeteringStationDesigner/MeteringStationDesigner.exe || { echo "SELFTEST FAILED"; exit 1; }
+
+      - name: Launch test (real server must start)
+        shell: bash
+        env:
+          MSD_PORT: "8599"
+        run: |
+          ./dist/MeteringStationDesigner/MeteringStationDesigner.exe > msd_launch.log 2>&1 &
+          APP_PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 2
+            if curl -sf "http://127.0.0.1:8599/_stcore/health" | grep -q ok; then ok=1; break; fi
+          done
+          if [ "$ok" != "1" ]; then
+            echo "LAUNCH FAILED — app did not serve /_stcore/health"
+            tail -60 msd_launch.log
+            kill $APP_PID 2>/dev/null
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8599/")
+          kill $APP_PID 2>/dev/null
+          echo "main page HTTP $code"
+          [ "$code" = "200" ] || exit 1
+
+      - name: Verify and Zip
+        run: |
+          dir dist\MeteringStationDesigner\
+          7z a MeteringStationDesigner_Windows.zip .\dist\MeteringStationDesigner\*
 
       - name: Upload to Release
         run: |
@@ -82,7 +112,7 @@ jobs:
 
       - name: Build with PyInstaller (.app bundle)
         run: |
-          pyinstaller --windowed --name MeteringStationDesigner --add-data "knowledge:knowledge" --add-data "VERSION:." --add-data "streamlit_app:streamlit_app" --collect-all streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab streamlit_app/app.py
+          pyinstaller --windowed --name MeteringStationDesigner --add-data "knowledge:knowledge" --add-data "VERSION:." --add-data "streamlit_app:streamlit_app" --add-data "metering_designer:metering_designer" --collect-all streamlit --hidden-import=plotly --hidden-import=pyaga8 --hidden-import=CoolProp --hidden-import=fluids --hidden-import=thermo --hidden-import=openpyxl --hidden-import=reportlab --hidden-import=numpy --hidden-import=pandas --hidden-import=matplotlib launcher.py
 
       - name: Ad-hoc codesign
         run: |
@@ -94,6 +124,34 @@ jobs:
           find "dist/MeteringStationDesigner.app" -type d -name "streamlit-*.dist-info" | grep -q . || { echo "streamlit dist-info NOT bundled"; exit 1; }
           find "dist/MeteringStationDesigner.app" -type d -path "*streamlit_app/pages" | grep -q . || { echo "streamlit_app/pages NOT bundled"; exit 1; }
           echo "bundle contents OK"
+
+      - name: Self-test (every page must execute)
+        env:
+          MSD_SELFTEST: "1"
+        run: |
+          "./dist/MeteringStationDesigner.app/Contents/MacOS/MeteringStationDesigner" || { echo "SELFTEST FAILED"; exit 1; }
+
+      - name: Launch test (real server must start)
+        env:
+          MSD_PORT: "8599"
+        run: |
+          "./dist/MeteringStationDesigner.app/Contents/MacOS/MeteringStationDesigner" > msd_launch.log 2>&1 &
+          APP_PID=$!
+          ok=0
+          for i in $(seq 1 30); do
+            sleep 2
+            if curl -sf "http://127.0.0.1:8599/_stcore/health" | grep -q ok; then ok=1; break; fi
+          done
+          if [ "$ok" != "1" ]; then
+            echo "LAUNCH FAILED — app did not serve /_stcore/health"
+            tail -60 msd_launch.log
+            kill $APP_PID 2>/dev/null
+            exit 1
+          fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:8599/")
+          kill $APP_PID 2>/dev/null
+          echo "main page HTTP $code"
+          [ "$code" = "200" ] || exit 1
 
       - name: Build DMG
         run: |

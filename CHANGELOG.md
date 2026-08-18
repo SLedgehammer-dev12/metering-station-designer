@@ -2,6 +2,30 @@
 
 All notable changes to Metering Station Designer.
 
+## [1.3.2] - 2026-08-18
+
+### Desktop app actually boots (macOS/Windows)
+The bundled apps in v1.3.0/v1.3.1 ran the Streamlit script in "bare mode" and
+exited immediately — the PyInstaller entry point was the app script itself, so
+no server was ever started. Fixed by introducing a real entry point.
+
+- **`launcher.py`** (new entry point): boots the Streamlit server directly via
+  `streamlit.web.bootstrap` and opens the default browser on startup. Resolves
+  the app from `sys._MEIPASS` when frozen and from the repo root otherwise;
+  forces `global.developmentMode=False` (the bundled package path would
+  otherwise auto-enable dev mode and reject `server.port`) and honours
+  `MSD_PORT` (default 8501).
+- **Packaging**: `metering_designer` is now shipped as data (it is imported by
+  runtime-loaded pages, so PyInstaller analysis could not discover its
+  submodules) and `launcher.py` puts `sys._MEIPASS` on `sys.path` before
+  anything imports it.
+- **`MSD_SELFTEST=1`**: new in-app self-test mode that runs the main app and
+  navigates through all 8 pages via Streamlit's AppTest/ScriptRunner in the
+  bundled process, exiting non-zero on any page exception.
+- **CI**: both build jobs now run the self-test (every page must execute) and a
+  live launch test (`/_stcore/health` → `ok`, main page HTTP 200) on the built
+  bundle before uploading — so a broken bundle can no longer be released.
+
 ## [1.3.1] - 2026-08-18
 
 ### Orifice Sizing ΔP Fix (`meters/orifice.py`)

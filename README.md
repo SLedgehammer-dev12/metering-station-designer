@@ -110,6 +110,12 @@ open /Applications/MeteringStationDesigner.app
 *Notarization requires a paid Apple Developer account; the app ships with an
 ad-hoc signature instead.*
 
+**Environment variables** (also apply to the Windows build):
+- `MSD_PORT` — server port (default `8501`).
+- `MSD_SELFTEST=1` — run the headless self-test (boots the app and navigates
+  through all 8 pages via Streamlit's test runner) and exit; used by CI and
+  useful to verify a build. Exit code 0 means every page rendered.
+
 ---
 
 ## Backend Fallback Chain
