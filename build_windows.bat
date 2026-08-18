@@ -37,7 +37,9 @@ if errorlevel 1 (
 pyinstaller --onedir --windowed --name MeteringStationDesigner ^
   --add-data "knowledge;knowledge" ^
   --add-data "VERSION;." ^
-  --hidden-import=streamlit --hidden-import=plotly ^
+  --add-data "streamlit_app;streamlit_app" ^
+  --collect-all streamlit ^
+  --hidden-import=plotly ^
   --hidden-import=numpy --hidden-import=pandas ^
   --hidden-import=pyaga8 --hidden-import=CoolProp ^
   --hidden-import=fluids --hidden-import=thermo ^

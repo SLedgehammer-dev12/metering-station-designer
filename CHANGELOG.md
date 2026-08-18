@@ -2,6 +2,20 @@
 
 All notable changes to Metering Station Designer.
 
+## [1.3.1] - 2026-08-18
+
+### Orifice Sizing ΔP Fix (`meters/orifice.py`)
+- `calc_beta_ratio` now iterates on the ISO flow equation (bisection within the standard β limits) instead of stopping on loose β-change criteria — fixes the case where the reported ΔP was up to ~9.5 % off the design target (e.g. 208 mbar vs 250 mbar).
+- Saturation handling: when the design ΔP cannot be reached within the standard β range (0.1–0.75), β is pinned at the limit and the result now reports `beta_saturated`, `saturation_dir`, `dp_attainable=False`, and the **achievable** ΔP (`dp_actual_mbar`, `dp_at_qmax_mbar`) instead of silently echoing the unachievable target.
+- `size_orifice_for_flow` computes `dp_design_mbar`, `dp_actual_mbar`, `dp_attainable`; `generate_design_advisories` surfaces `std_adv_dp_not_attainable` (TR+EN) when the target is out of reach.
+- Permanent pressure loss is computed from the achievable (actual) ΔP.
+
+### Desktop Packaging Fix (macOS/Windows)
+- PyInstaller builds now use `--collect-all streamlit` (bundles `streamlit-*.dist-info`, required by Streamlit ≥1.5x at import) and ship `streamlit_app/` as data — fixes the frozen-app crash `PackageNotFoundError: No package metadata was found for streamlit` and the missing pages/components.
+- `streamlit_app/` package now has `__init__.py` files; `app.py` resolves the pages directory from `sys._MEIPASS` when frozen and from the repo root otherwise, and registers that base on `sys.path` for `streamlit_app.components.*` imports.
+- CI adds a post-build verification step that fails if the bundle lacks `streamlit-*.dist-info` or `streamlit_app/pages`; same flags applied to `build_windows.bat`.
+- README documents the macOS Gatekeeper workaround (`xattr -dr com.apple.quarantine` / right-click → Open) for the ad-hoc signed DMG.
+
 ## [1.3.0] - 2026-08-17
 
 ### Real-Gas Thermodynamics (`core/backends.py`, `fluids/gas.py`)

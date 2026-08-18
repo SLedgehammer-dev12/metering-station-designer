@@ -361,9 +361,14 @@ def test_page_files_resolve_from_repo_root():
     src = open(os.path.join(ROOT, "streamlit_app", "app.py"), encoding="utf-8").read()
     page_dir_match = re.search(r'_PAGE_DIR\s*=\s*os\.path\.join\([^\n]+', src)
     page_files_match = re.search(r'PAGE_FILES\s*=\s*\{.*?\n\}', src, re.DOTALL)
+    base_dir_match = re.search(r'_BASE_DIR\s*=\s*sys\._MEIPASS[^\n]+', src)
     assert page_dir_match, "_PAGE_DIR definition missing in app.py"
     assert page_files_match, "PAGE_FILES definition missing in app.py"
-    ns = {"os": os, "__file__": os.path.join(ROOT, "streamlit_app", "app.py")}
+    assert base_dir_match, "_BASE_DIR definition missing in app.py"
+    ns = {"os": os, "sys": sys,
+          "__file__": os.path.join(ROOT, "streamlit_app", "app.py")}
+    # Dev branch of _BASE_DIR: repo root (skip the frozen sys._MEIPASS branch).
+    ns["_BASE_DIR"] = os.path.dirname(os.path.dirname(os.path.join(ROOT, "streamlit_app", "app.py")))
     exec(page_dir_match.group(0), ns)
     exec(page_files_match.group(0), ns)
     page_dir = ns["_PAGE_DIR"]

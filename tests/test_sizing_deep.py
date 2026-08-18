@@ -249,3 +249,70 @@ def test_erosional_intermittent():
     e_cont = check_erosional_velocity(10, 50, service_type="continuous")
     assert e_cont["C_factor"] == 122
     assert e_int["v_erosional_m_s"] > e_cont["v_erosional_m_s"]
+
+
+def test_orifice_dp_converges_to_target():
+    """Orifice sizing must converge: achievable ΔP ≈ requested ΔP in a normal design."""
+    from metering_designer.piping import pipe_id_mm
+    D = pipe_id_mm(4)
+    for dp in (250, 500, 1000):
+        r = size_orifice_for_flow(15000, 1500, D, 41.0, 40, 40, 1.5e-5, 0.9, 0.75,
+                                  standard="iso5167_2", dp_design_mbar=dp)
+        assert r["dp_attainable"] is True, f"dp={dp}: expected attainable"
+        assert r["dp_at_qmax_mbar"] == pytest.approx(dp, abs=3), \
+            f"dp={dp}: achievable {r['dp_at_qmax_mbar']} != target"
+
+
+def test_orifice_beta_moves_with_dp_when_attainable():
+    """Higher target ΔP → smaller β (physical, in a non-saturated design)."""
+    from metering_designer.piping import pipe_id_mm
+    D = pipe_id_mm(4)
+    r250 = size_orifice_for_flow(15000, 1500, D, 41.0, 40, 40, 1.5e-5, 0.9, 0.75,
+                                 standard="iso5167_2", dp_design_mbar=250)
+    r1000 = size_orifice_for_flow(15000, 1500, D, 41.0, 40, 40, 1.5e-5, 0.9, 0.75,
+                                  standard="iso5167_2", dp_design_mbar=1000)
+    assert r250["dp_attainable"] and r1000["dp_attainable"]
+    assert r1000["beta"] < r250["beta"], "β must shrink as ΔP target grows"
+
+
+def test_orifice_dp_saturation_reported():
+    """When the target ΔP is unachievable within β limits, the result must say so
+    and report the achievable ΔP instead of echoing the target."""
+    from metering_designer.piping import pipe_id_mm
+    D = pipe_id_mm(3)
+    r = size_orifice_for_flow(30000, 3000, D, 41.0, 40, 40, 1.5e-5, 0.9, 0.75,
+                              standard="iso5167_2", dp_design_mbar=250)
+    assert r["beta_saturated"] is True
+    assert r["saturation_dir"] == "low"
+    assert r["dp_attainable"] is False
+    assert r["beta"] == 0.75  # pinned at the upper standard limit
+    assert r["dp_at_qmax_mbar"] != 250, "must not echo an unachievable target"
+    assert r["dp_at_qmax_mbar"] > 250, "pinned-upper-β plate produces MORE ΔP than the low target"
+    assert r["dp_actual_mbar"] == pytest.approx(r["dp_at_qmax_mbar"], rel=0.02)
+
+
+def test_orifice_dp_saturation_sweep_constant_beta():
+    """Sweeping ΔP in a saturated design leaves β/d/Cd pinned but flags it."""
+    from metering_designer.piping import pipe_id_mm
+    D = pipe_id_mm(3)
+    betas = set()
+    attainable_any = False
+    for dp in (100, 250, 500, 1000):
+        r = size_orifice_for_flow(30000, 3000, D, 41.0, 40, 40, 1.5e-5, 0.9, 0.75,
+                                  standard="iso5167_2", dp_design_mbar=dp)
+        betas.add(round(r["beta"], 4))
+        if r["dp_attainable"]:
+            attainable_any = True
+    assert betas == {0.75}, f"β must stay pinned at 0.75, got {betas}"
+    assert attainable_any is False, "no ΔP in the sweep may be attainable"
+
+
+def test_orifice_dp_not_attainable_advisory():
+    """The saturation state must surface as a design advisory."""
+    from metering_designer.meters.orifice import generate_design_advisories
+    adv = generate_design_advisories(0.75, 13.3, 250, dp_attainable=False, dp_actual_mbar=1332)
+    keys = [a["key"] for a in adv]
+    assert "std_adv_dp_not_attainable" in keys
+    msg = next(a for a in adv if a["key"] == "std_adv_dp_not_attainable")
+    assert msg["values"]["target"] == 250
+    assert msg["values"]["actual"] == 1332

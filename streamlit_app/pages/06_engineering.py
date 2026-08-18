@@ -134,7 +134,9 @@ if "orifice" in meter_key:
         st.caption(meter_details["notes"])
     for adv in generate_design_advisories(meter_details.get("beta", 0),
                                           meter_details.get("dp_at_qmin_mbar", 0),
-                                          meter_details.get("dp_design_mbar", dp_design)):
+                                          meter_details.get("dp_design_mbar", dp_design),
+                                          dp_attainable=meter_details.get("dp_attainable", True),
+                                          dp_actual_mbar=meter_details.get("dp_actual_mbar")):
         if adv["level"] == "warning":
             st.warning(t(adv["key"]).format(**adv.get("values", {})))
         else:

@@ -1,9 +1,19 @@
 import importlib.util
 import os
+import sys
 
 import streamlit as st
 
 from metering_designer.core.i18n import get_text
+
+# Base directory that contains the `streamlit_app` package. In a frozen
+# PyInstaller build the pages/components ship as data under sys._MEIPASS;
+# in development this is the repository root. Pages are loaded at runtime by
+# path (importlib), so PyInstaller cannot discover them statically — the
+# resolved base must be on sys.path for `streamlit_app.components.*` imports.
+_BASE_DIR = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _BASE_DIR not in sys.path:
+    sys.path.insert(0, _BASE_DIR)
 
 st.set_page_config(
     page_title="Ölçüm İstasyonu Dizayn Asistanı",
@@ -75,7 +85,7 @@ else:
 st.sidebar.markdown("---")
 
 PAGE_KEYS = ["project", "process", "requirements", "weights", "results", "engineering", "report", "inspection"]
-_PAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pages")
+_PAGE_DIR = os.path.join(_BASE_DIR, "streamlit_app", "pages")
 PAGE_FILES = {
     "project": "01_project.py",
     "process": "02_process.py",

@@ -99,51 +99,74 @@ def calc_beta_ratio(
     v_m_s = qm_kg_s / (rho_kg_m3 * A_pipe) if rho_kg_m3 > 0 and A_pipe > 0 else 0
     Re = rho_kg_m3 * v_m_s * D_m / mu_Pa_s if mu_Pa_s > 0 else 1e6
 
-    # Initial estimate: β from simplified ΔP equation
-    # ΔP ∝ qm² / (β² * ...)
-    beta = 0.6
-    for i in range(30):
-        eps = _expansibility_factor(beta, dp_target_Pa, p1_Pa)
+    def _flow_at(beta: float, dp_Pa: float) -> float:
+        """qm at given β and ΔP per ISO 5167-2 (Cd·ε·A_t·√(2ρΔP)/√(1−β⁴))."""
+        if rho_kg_m3 <= 0 or A_pipe <= 0:
+            return 0.0
+        eps = _expansibility_factor(beta, dp_Pa, p1_Pa)
         Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
-        d_mm = beta * D_mm
-        d_m = d_mm / 1000
-        A_throat = math.pi * (d_m / 2) ** 2
-        E = 1.0 / math.sqrt(1 - beta ** 4)
+        d_m = (beta * D_mm / 1000) / 2
+        A_throat = math.pi * d_m ** 2
+        return Cd * eps * A_throat * math.sqrt(2 * rho_kg_m3 * dp_Pa) / math.sqrt(1 - beta ** 4)
 
-        # Flow equation: qm = Cd * eps * E * A_throat * sqrt(2*rho*ΔP) / sqrt(1-β⁴)
-        # Rearranged for qm verification
-        qm_calc = Cd * eps * A_throat * math.sqrt(2 * rho_kg_m3 * dp_target_Pa) / math.sqrt(1 - beta ** 4)
+    # Solve for β that passes qm at the target ΔP. qm_calc increases
+    # monotonically with β, so bisection within the standard's β limits is
+    # exact. When the required β falls outside the limits the design is
+    # saturated: the target ΔP is not achievable on this line/flow.
+    beta = 0.6
+    beta_saturated = False
+    saturation_dir = None
+    if qm_kg_s > 0 and rho_kg_m3 > 0 and A_pipe > 0:
+        qm_hi = _flow_at(beta_limit_hi, dp_target_Pa)
+        qm_lo = _flow_at(beta_limit_lo, dp_target_Pa)
+        if qm_hi < qm_kg_s:
+            # Even the largest bore passes too little flow at the target ΔP →
+            # the requested ΔP is below what this line can achieve; β pins high.
+            beta = beta_limit_hi
+            beta_saturated = True
+            saturation_dir = "low"
+        elif qm_lo > qm_kg_s:
+            # Even the smallest bore passes too much flow → ΔP target too high;
+            # β pins low.
+            beta = beta_limit_lo
+            beta_saturated = True
+            saturation_dir = "high"
+        else:
+            lo, hi = beta_limit_lo, beta_limit_hi
+            for _ in range(60):
+                mid = 0.5 * (lo + hi)
+                if _flow_at(mid, dp_target_Pa) < qm_kg_s:
+                    lo = mid
+                else:
+                    hi = mid
+                if (hi - lo) < 1e-7:
+                    break
+            beta = 0.5 * (lo + hi)
 
-        # Refine β
-        if qm_calc <= 0:
-            beta = min(beta + 0.1, 0.75)
-            continue
-
-        factor = qm_kg_s / qm_calc
-        target_factor = 1.0
-        beta_new = beta * math.pow(factor, 0.25) if factor > 0 else beta
-
-        if beta_new < beta_limit_lo:
-            beta_new = beta_limit_lo
-        elif beta_new > beta_limit_hi:
-            beta_new = beta_limit_hi
-
-        if abs(beta_new - beta) < 1e-5:
-            beta = beta_new
-            break
-        beta = beta_new
-
-    # Final Cd with converged β
-    beta = max(beta_limit_lo, min(beta, beta_limit_hi))
     d_mm = beta * D_mm
     Cd = _discharge_coefficient_rhg(beta, Re, D_mm, tap_type=tap_type)
     eps = _expansibility_factor(beta, dp_target_Pa, p1_Pa)
-    d_m = d_mm / 1000
-    A_throat = math.pi * (d_m / 2) ** 2
 
-    # Permanent pressure loss
+    # Achievable ΔP at the solved β (invert the flow equation). Relevant when
+    # saturated: the plate can only deliver this ΔP at Qmax, not the target.
+    dp_actual_Pa = dp_target_Pa
+    if qm_kg_s > 0 and rho_kg_m3 > 0:
+        d_m = d_mm / 1000
+        A_throat = math.pi * (d_m / 2) ** 2
+        if A_throat > 0:
+            dp_actual_Pa = (qm_kg_s * math.sqrt(1 - beta ** 4) / (Cd * eps * A_throat)) ** 2 / (2 * rho_kg_m3)
+            if dp_actual_Pa > 0:
+                # Re-resolve ε at the achievable ΔP (one pass is sufficient).
+                eps = _expansibility_factor(beta, dp_actual_Pa, p1_Pa)
+                dp_actual_Pa = (qm_kg_s * math.sqrt(1 - beta ** 4) / (Cd * eps * A_throat)) ** 2 / (2 * rho_kg_m3)
+
+    dp_attainable = not beta_saturated
+    if dp_attainable:
+        dp_attainable = abs(dp_actual_Pa - dp_target_Pa) / dp_target_Pa < 0.005
+
+    # Permanent pressure loss from the ACTUAL ΔP of the designed plate.
     pl_ratio = 1.0 - (beta ** 1.9)
-    dp_permanent_Pa = dp_target_Pa * pl_ratio
+    dp_permanent_Pa = dp_actual_Pa * pl_ratio
 
     # Check β limits per selected standard
     beta_ok = beta_limit_lo <= beta <= beta_limit_hi
@@ -159,6 +182,11 @@ def calc_beta_ratio(
         "Re": round(Re, 0),
         "dp_orifice_Pa": round(dp_target_Pa, 0),
         "dp_orifice_mbar": round(dp_target_Pa / 100, 1),
+        "dp_actual_Pa": round(dp_actual_Pa, 0),
+        "dp_actual_mbar": round(dp_actual_Pa / 100, 1),
+        "dp_attainable": dp_attainable,
+        "beta_saturated": beta_saturated,
+        "saturation_dir": saturation_dir,
         "dp_permanent_Pa": round(dp_permanent_Pa, 0),
         "dp_permanent_mbar": round(dp_permanent_Pa / 100, 1),
         "beta_valid": beta_ok,
@@ -175,7 +203,9 @@ def calc_beta_ratio(
 
 
 def generate_design_advisories(beta: float, dp_at_qmin_mbar: float,
-                               dp_design_mbar: float, standard: dict | None = None) -> list[dict]:
+                               dp_design_mbar: float, standard: dict | None = None,
+                               dp_attainable: bool = True,
+                               dp_actual_mbar: float | None = None) -> list[dict]:
     """Produce structured advisory messages for the design dP and β choice.
 
     Each entry: {'level': 'info'|'warning', 'key': <i18n key>, 'values': {...}}.
@@ -202,11 +232,15 @@ def generate_design_advisories(beta: float, dp_at_qmin_mbar: float,
         advisories.append({"level": "warning", "key": "std_adv_beta_low",
                            "values": {"lo": beta_rec_lo}})
 
+    if not dp_attainable:
+        advisories.append({"level": "warning", "key": "std_adv_dp_not_attainable",
+                           "values": {"target": dp_design_mbar,
+                                      "actual": dp_actual_mbar or 0}})
     if dp_at_qmin_mbar < 10:
         advisories.append({"level": "warning", "key": "std_adv_dp_low",
                            "values": {"dp": dp_at_qmin_mbar}})
     advisories.append({"level": "info", "key": "std_adv_dp_design",
-                       "values": {"dp": dp_design_mbar}})
+                       "values": {"dp": dp_actual_mbar if dp_actual_mbar else dp_design_mbar}})
     return advisories
 
 
@@ -317,14 +351,18 @@ def size_orifice_for_flow(
 
     D_m = D_mm / 1000
     A_pipe = math.pi * (D_m / 2) ** 2
-    dp_min = dp_max_Pa * (qm_min / qm_max) ** 2 if qm_max > 0 else 0
+    dp_actual_Pa = result.get("dp_actual_Pa", dp_max_Pa)
+    # ΔP scales with the square of flow, so Qmin sees (qmin/qmax)² of the
+    # achievable (not merely requested) Qmax ΔP.
+    dp_min = dp_actual_Pa * (qm_min / qm_max) ** 2 if qm_max > 0 else 0
     turndown_actual = q_max_Sm3h / q_min_Sm3h if q_min_Sm3h > 0 else float("inf")
 
     result["turndown_actual"] = round(turndown_actual, 2)
     result["turndown_ok"] = turndown_actual >= 10
     result["dp_at_qmin_mbar"] = round(dp_min / 100, 2)
-    result["dp_at_qmax_mbar"] = round(dp_max_Pa / 100, 1)
+    result["dp_at_qmax_mbar"] = round(dp_actual_Pa / 100, 1)
     result["dp_design_mbar"] = round(dp_max_Pa / 100, 1)
+    result["dp_attainable"] = bool(result.get("dp_attainable"))
     result["standard"] = std["standard"]
     result["standard_name"] = std["standard_name"]
     result["standard_ref"] = std["standard_ref"]

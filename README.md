@@ -95,6 +95,21 @@ build_windows.bat
 # Output: dist\app.dist\app.exe
 ```
 
+### Option 4 — macOS .dmg (Pre-built app)
+The release DMG contains an **ad-hoc signed** (non-notarized) app, so on
+first launch macOS Gatekeeper may block it with *"cannot be opened because the
+developer cannot be verified"*. Either:
+
+1. Right-click the app → **Open** → **Open** (one-time override), or
+2. Remove the quarantine attribute, then open normally:
+```bash
+xattr -dr com.apple.quarantine "/Applications/MeteringStationDesigner.app"
+open /Applications/MeteringStationDesigner.app
+```
+
+*Notarization requires a paid Apple Developer account; the app ships with an
+ad-hoc signature instead.*
+
 ---
 
 ## Backend Fallback Chain
