@@ -2,6 +2,27 @@
 
 All notable changes to Metering Station Designer.
 
+## [1.3.3] - 2026-08-19
+
+### Calculation audit + Coriolis zero-stability fix
+Ran a 15-scenario cross-validation audit across gas properties, orifice sizing,
+all meter types, erosional velocity and piping. All scenarios passed; the
+checks are locked in as regression tests.
+
+- **`tests/test_calc_scenarios.py`** (new, 13 tests): density vs ideal-gas law
+  (`ρ = P·M/(Z·R·T)`, pressure treated as absolute), Z bounds at low/high
+  pressure, Wobbe ordering (rich > lean), methane speed of sound, orifice
+  round-trip (sized d + ΔP reproduces q_max within 2%), orifice saturation
+  honesty (β pinned, real ΔP reported), ΔP↑→β↓ monotonicity, Venturi permanent
+  loss ≈15% (ISO 5167-4), erosional C factors (122/152.5) and rejection of
+  unphysical velocity, pipe-ID monotonicity.
+- **Coriolis zero stability fix** (`metering_designer/meters/coriolis.py`):
+  zero stability was a fixed `0.005 kg/s` regardless of meter size, causing a
+  borderline ~4.8% zero-drift at Qmin for a 1.5" meter. It now scales with
+  meter capacity (~0.05% of full scale, ISO 10790 / AGA 11 representative
+  value), and an explicit note warns when the Qmin zero-drift exceeds 5%
+  (recommending a larger Qmin or smaller meter).
+
 ## [1.3.2] - 2026-08-18
 
 ### Desktop app actually boots (macOS/Windows)

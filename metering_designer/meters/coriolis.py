@@ -42,8 +42,9 @@ def size_coriolis(
 
     capacity_pct = qm_max_kg_s / max_flow_per_size_kg_s.get(meter_size, 1) * 100
 
-    # Zero drift effect
-    zero_stability = 0.005  # kg/s typical for medium size
+    # Zero drift effect: zero stability scales with meter capacity
+    # (ISO 10790 / AGA 11, ~0.05% of full scale is a representative value).
+    zero_stability = 0.0005 * max_flow_per_size_kg_s.get(meter_size, 1)
     zero_effect_at_qmin = zero_stability / qm_min_kg_s * 100 if qm_min_kg_s > 0 else 100
 
     # Pressure drop estimation
@@ -121,4 +122,6 @@ def _coriolis_notes(cap_pct: float, zero_effect: float) -> str:
         notes.append("Kapasite sınırında, over-range riski var")
     if zero_effect > 0.5:
         notes.append(f"Sıfır kayması etkisi yüksek ({zero_effect:.2f}% @ Qmin)")
+    if zero_effect > 5.0:
+        notes.append("Sıfır kayması %5 aştı: Qmin artırın veya daha küçük metre seçin")
     return "; ".join(notes) if notes else "Boyutlandırma optimum"
